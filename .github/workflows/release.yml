@@ -1,0 +1,416 @@
+# On every push to main: patch-bump version, build Linux/Windows binaries, publish a
+# GitHub Release, then commit Cargo.toml + Cargo.lock + module.toml on main ([skip ci]).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: "Optional semver X.Y.Z (no v prefix). Empty = auto patch bump from Cargo.toml."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-blvm-selective-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Version + Cargo manifests
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      version_tag: ${{ steps.plan.outputs.version_tag }}
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/main' &&
+       github.event.head_commit != null &&
+       !contains(github.event.head_commit.message, '[skip ci]') &&
+       !contains(github.event.head_commit.message, '[ci skip]') &&
+       !contains(github.event.head_commit.message, '[skip release]'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust (for lockfile)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Fetch tags (avoid releasing an existing tag)
+        run: git fetch --tags origin
+
+      - name: Strip [patch.crates-io] and resolve lockfile
+        shell: python3 {0}
+        run: |
+          import re, pathlib, subprocess
+          p = pathlib.Path("Cargo.toml")
+          text = p.read_text()
+          text = re.sub(r"\n\[patch\.crates-io\].*", "", text, flags=re.DOTALL)
+          p.write_text(text)
+          pathlib.Path("Cargo.lock").unlink(missing_ok=True)
+          subprocess.run(["cargo", "generate-lockfile"], check=True)
+
+      - name: Determine release version
+        id: plan
+        env:
+          OVERRIDE_RAW: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version_override || '' }}
+        run: |
+          set -euo pipefail
+          pkg_version() {
+            grep -A 12 '^\[package\]' Cargo.toml | grep '^version = ' | head -1 | sed -E 's/^version = "([^"]+)".*/\1/'
+          }
+
+          MAJOR=""
+          MINOR=""
+          PATCH=""
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${OVERRIDE_RAW:-}" ]; then
+            VERSION="${OVERRIDE_RAW#v}"
+            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "version_override must be plain semver X.Y.Z (got: $VERSION)"
+              exit 1
+            fi
+          else
+            CURRENT="$(pkg_version)"
+            if ! echo "$CURRENT" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "Expected Cargo.toml [package].version like X.Y.Z, got: $CURRENT"
+              exit 1
+            fi
+            MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+            MINOR=$(echo "$CURRENT" | cut -d. -f2)
+            PATCH=$(echo "$CURRENT" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          tag_free() {
+            ! git rev-parse "v$1" >/dev/null 2>&1 && ! git ls-remote --tags origin "refs/tags/v$1" | grep -q .
+          }
+
+          if ! tag_free "$VERSION"; then
+            if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${OVERRIDE_RAW:-}" ]; then
+              echo "Tag v${VERSION} already exists; use a different version_override."
+              exit 1
+            fi
+            if [ -z "$MAJOR" ]; then
+              MAJOR=$(echo "$VERSION" | cut -d. -f1)
+              MINOR=$(echo "$VERSION" | cut -d. -f2)
+              PATCH=$(echo "$VERSION" | cut -d. -f3)
+            fi
+            echo "Tag v${VERSION} exists, scanning for next free patch..."
+            for _ in $(seq 1 30); do
+              PATCH=$((PATCH + 1))
+              VERSION="${MAJOR}.${MINOR}.${PATCH}"
+              if tag_free "$VERSION"; then
+                break
+              fi
+            done
+          fi
+
+          awk -v ver="$VERSION" '
+            /^\[package\]/ { in_pkg = 1; print; next }
+            /^\[/ { in_pkg = 0 }
+            in_pkg && /^version = / {
+              print "version = \"" ver "\""
+              next
+            }
+            { print }
+          ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+
+          cargo generate-lockfile
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${VERSION} (tag v${VERSION})"
+
+      - name: Upload Cargo.toml + Cargo.lock for matrix builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-cargo-manifests
+          path: |
+            Cargo.toml
+            Cargo.lock
+          if-no-files-found: error
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runs_on: [self-hosted, Linux, X64, builds]
+            artifact_name: selective-sync-x86_64-linux
+            binary_suffix: ""
+            use_cross: false
+          - target: aarch64-unknown-linux-gnu
+            runs_on: [self-hosted, Linux, X64, builds]
+            artifact_name: selective-sync-aarch64-linux
+            binary_suffix: ""
+            use_cross: true
+          - target: x86_64-pc-windows-msvc
+            runs_on: windows-2022
+            artifact_name: selective-sync-x86_64-windows.exe
+            binary_suffix: ".exe"
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore prepared Cargo manifests
+        uses: actions/download-artifact@v4
+        with:
+          name: release-cargo-manifests
+
+      - name: Strip [patch.crates-io] for crates.io-only build
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Job-local HOME (Linux; avoid rustc ETXTBSY on shared rustup)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "${RUNNER_TEMP}/blvm-selective-sync-release-home"
+          echo "HOME=${RUNNER_TEMP}/blvm-selective-sync-release-home" >> "$GITHUB_ENV"
+
+      - name: Runner cache key (Linux)
+        if: runner.os == 'Linux'
+        id: runner_cache
+        run: |
+          DEPS_KEY=$(sha256sum Cargo.toml | cut -d' ' -f1)
+          TOOLCHAIN=$(grep -E '^channel|rust-version' rust-toolchain.toml Cargo.toml 2>/dev/null | head -1 | sha256sum | cut -d' ' -f1 || echo "stable")
+          CACHE_KEY="${DEPS_KEY}-${TOOLCHAIN}"
+          echo "cache-key=${CACHE_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache bind env (Linux self-hosted)
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ steps.runner_cache.outputs.cache-key }}-${{ matrix.target }}
+
+      - name: Restore Cargo cache (Linux self-hosted)
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: restore
+
+      - name: Install Rust (Linux self-hosted)
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+
+      - name: Install Rust (Windows)
+        if: runner.os == 'Windows'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Add Rust target (pinned toolchain, Linux)
+        if: runner.os == 'Linux'
+        run: rustup target add ${{ matrix.target }}
+
+      # MSVC / Windows native builds.
+      - name: MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install cross (aarch64 Linux)
+        if: matrix.use_cross
+        run: cargo install cross --locked
+
+      - name: Build release binary (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --locked --release --target ${{ matrix.target }}
+          else
+            cargo build --locked --release --target ${{ matrix.target }}
+          fi
+        env:
+          CARGO_INCREMENTAL: "1"
+
+      - name: Build release binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cargo build --locked --release --target ${{ matrix.target }}
+        env:
+          CARGO_INCREMENTAL: "0"
+
+      - name: Compute sha256
+        id: sha256
+        shell: bash
+        run: |
+          BINARY="target/${{ matrix.target }}/release/selective-sync${{ matrix.binary_suffix }}"
+          cp "$BINARY" "${{ matrix.artifact_name }}"
+          if command -v sha256sum &>/dev/null; then
+            SHA=$(sha256sum "${{ matrix.artifact_name }}" | awk '{print $1}')
+          elif command -v shasum &>/dev/null; then
+            SHA=$(shasum -a 256 "${{ matrix.artifact_name }}" | awk '{print $1}')
+          else
+            SHA=$(certutil -hashfile "${{ matrix.artifact_name }}" SHA256 | sed -n '2p' | tr -d ' \r')
+          fi
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "$SHA  ${{ matrix.artifact_name }}" >> sha256sums.txt
+
+      - name: Save Cargo cache (Linux self-hosted)
+        if: always() && runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
+
+      - name: Prune old runner caches (Linux self-hosted)
+        if: always() && runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: prune
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_name }}
+            sha256sums.txt
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build + manifest artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Combine sha256sums
+        run: |
+          find artifacts -name sha256sums.txt -print0 | xargs -0 cat | sort -u > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: List artifacts (sanity check)
+        run: find artifacts -type f | sort
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ needs.prepare.outputs.version_tag }}
+          name: blvm-selective-sync ${{ needs.prepare.outputs.version_tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          fail_on_unmatched_files: true
+          body: |
+            ## blvm-selective-sync ${{ needs.prepare.outputs.version_tag }} (semver ${{ needs.prepare.outputs.version }})
+
+            Automated module release for commit [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}).
+
+            Hot-loadable BLVM **selective sync** policy module (binary `selective-sync`).
+
+            ### Checksums
+
+            See `sha256sums.txt` attached to this release.
+          files: |
+            artifacts/selective-sync-x86_64-linux/selective-sync-x86_64-linux
+            artifacts/selective-sync-aarch64-linux/selective-sync-aarch64-linux
+            artifacts/selective-sync-x86_64-windows.exe/selective-sync-x86_64-windows.exe
+            sha256sums.txt
+          draft: false
+          prerelease: ${{ contains(needs.prepare.outputs.version, '-') }}
+
+  finalize:
+    name: Sync Cargo.toml + module.toml on main
+    needs: [prepare, release]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download build artifacts (for checksums)
+        uses: actions/download-artifact@v4
+        with:
+          path: artifact-dl/
+
+      - name: Merge sha256sums
+        run: find artifact-dl -name sha256sums.txt -print0 | xargs -0 cat | sort -u > sha256sums.txt
+
+      - name: Download prepared Cargo manifests (overwrite workspace)
+        uses: actions/download-artifact@v4
+        with:
+          name: release-cargo-manifests
+
+      - name: Patch module.toml (URLs + plain semver)
+        env:
+          VERSION_PLAIN: ${{ needs.prepare.outputs.version }}
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+        run: |
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION_TAG}"
+
+          SHA_X86_LINUX=$(grep     "selective-sync-x86_64-linux$"   sha256sums.txt | awk '{print $1}')
+          SHA_AARCH64_LINUX=$(grep "selective-sync-aarch64-linux$"  sha256sums.txt | awk '{print $1}')
+          SHA_X86_WINDOWS=$(grep   "blvm-zmq-x86_64-windows\.exe$" sha256sums.txt | awk '{print $1}')
+
+          export VERSION_PLAIN BASE_URL SHA_X86_LINUX SHA_AARCH64_LINUX SHA_X86_WINDOWS
+          python3 - <<'PYEOF'
+          import re, pathlib, os
+
+          version_plain = os.environ["VERSION_PLAIN"]
+          base_url = os.environ["BASE_URL"]
+
+          platforms = {
+              "x86_64-linux":   ("selective-sync-x86_64-linux",   os.environ["SHA_X86_LINUX"]),
+              "aarch64-linux":  ("selective-sync-aarch64-linux",  os.environ["SHA_AARCH64_LINUX"]),
+              "x86_64-windows": ("selective-sync-x86_64-windows.exe", os.environ["SHA_X86_WINDOWS"]),
+          }
+
+          p = pathlib.Path("module.toml")
+          text = p.read_text()
+
+          text = re.sub(
+              r'^(version\s*=\s*)"[^"]*"',
+              rf'\g<1>"{version_plain}"',
+              text, flags=re.MULTILINE
+          )
+
+          lines = ["\n[downloads]"]
+          for key, (artifact, sha) in platforms.items():
+              url = f"{base_url}/{artifact}"
+              lines.append(f'{key:<14}= {{ url = "{url}", sha256 = "{sha}" }}')
+          new_downloads = "\n".join(lines) + "\n"
+
+          if "[downloads]" in text:
+              text = re.sub(r'\n\[downloads\].*', new_downloads, text, flags=re.DOTALL)
+          else:
+              text = text.rstrip("\n") + new_downloads
+
+          p.write_text(text)
+          print(f"module.toml updated: version={version_plain}")
+          PYEOF
+
+      - name: Commit and push
+        env:
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add module.toml Cargo.toml
+          git add -f Cargo.lock
+          git diff --staged --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "chore: release ${VERSION_TAG} — sync Cargo.toml, module.toml [skip ci]"
+          git push origin main

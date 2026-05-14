@@ -41,6 +41,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Local monorepo: sibling paths override the version pins above.
+# Strip this section in CI/release (BTCDecoded/rust-ci/strip-patch-crates-io@main).
 [patch.crates-io]
 blvm-protocol = { path = "../blvm-protocol" }
 blvm-consensus = { path = "../blvm-consensus" }
@@ -49,3 +50,5 @@ blvm-muhash = { path = "../blvm-muhash" }
 blvm-node = { path = "../blvm-node" }
 blvm-sdk = { path = "../blvm-sdk" }
 blvm-sdk-macros = { path = "../blvm-sdk/crates/blvm-sdk-macros" }
+blvm-primitives = { path = "../blvm-primitives" }
+blvm-secp256k1 = { path = "../blvm-secp256k1" }

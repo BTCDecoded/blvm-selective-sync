@@ -1,0 +1,16 @@
+name = "blvm-selective-sync"
+version = "0.1.0"
+description = "Selective sync: download policy for flagged transaction content during IBD"
+author = "Bitcoin Commons Team"
+entry_point = "selective-sync"
+
+capabilities = [
+    "read_blockchain",
+    "subscribe_events",
+]
+
+# CI fills url/sha256 on release — artifact names use `selective-sync-*` (binary name).
+[downloads]
+x86_64-linux   = { url = "", sha256 = "" }
+aarch64-linux  = { url = "", sha256 = "" }
+x86_64-windows = { url = "", sha256 = "" }
