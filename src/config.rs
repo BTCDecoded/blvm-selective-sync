@@ -71,8 +71,8 @@ impl SyncPolicyConfig {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("Failed to create {}", parent.display()))?;
         }
-        let data = toml::to_string_pretty(self)
-            .with_context(|| format!("Failed to serialize config"))?;
+        let data =
+            toml::to_string_pretty(self).with_context(|| format!("Failed to serialize config"))?;
         std::fs::write(&path, data).with_context(|| format!("Failed to write {}", path.display()))
     }
 

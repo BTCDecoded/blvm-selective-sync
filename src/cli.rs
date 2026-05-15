@@ -13,8 +13,12 @@ use blvm_protocol::spam_filter::SpamFilterPreset;
 #[derive(Debug, Clone)]
 pub enum SyncPolicyCommand {
     List,
-    Subscribe { url: String },
-    Unsubscribe { url: String },
+    Subscribe {
+        url: String,
+    },
+    Unsubscribe {
+        url: String,
+    },
     Refresh,
     Status,
     BuildEntry {
@@ -29,7 +33,9 @@ pub enum SyncPolicyCommand {
         block_height: Option<u64>,
         output_path: Option<String>,
     },
-    ExportRegistry { output_path: Option<String> },
+    ExportRegistry {
+        output_path: Option<String>,
+    },
     ConfigPath,
 }
 
@@ -72,8 +78,16 @@ fn run_sync_policy_impl<W: Write>(
             preset,
             block_height,
             output_path,
-        } => run_build_registry(w, &block_hex_or_path, preset, block_height, output_path.as_deref()),
-        SyncPolicyCommand::ExportRegistry { output_path } => run_export_registry(w, output_path.as_deref()),
+        } => run_build_registry(
+            w,
+            &block_hex_or_path,
+            preset,
+            block_height,
+            output_path.as_deref(),
+        ),
+        SyncPolicyCommand::ExportRegistry { output_path } => {
+            run_export_registry(w, output_path.as_deref())
+        }
         SyncPolicyCommand::ConfigPath => run_config_path(w),
     }
 }
@@ -146,14 +160,24 @@ fn run_refresh<W: Write>(
 ) -> Result<()> {
     let mut config = SyncPolicyConfig::load(SyncPolicyConfig::config_path())?;
     if config.registries.is_empty() {
-        writeln!(w, "No registries to refresh. Subscribe first: blvm sync-policy subscribe <url>")?;
+        writeln!(
+            w,
+            "No registries to refresh. Subscribe first: blvm sync-policy subscribe <url>"
+        )?;
         return Ok(());
     }
     // TODO: fetch from each registry URL, aggregate entries
     config.last_refresh = Some(now_iso());
     config.save()?;
-    writeln!(w, "✓ Refresh triggered (registry fetch not yet implemented)")?;
-    writeln!(w, "  Last refresh: {}", config.last_refresh.as_deref().unwrap_or("never"))?;
+    writeln!(
+        w,
+        "✓ Refresh triggered (registry fetch not yet implemented)"
+    )?;
+    writeln!(
+        w,
+        "  Last refresh: {}",
+        config.last_refresh.as_deref().unwrap_or("never")
+    )?;
     if let Some(c) = ctx {
         publish_selective_sync_policy_applied(c, "refresh", config.registries.len());
     }
@@ -196,10 +220,20 @@ fn run_status<W: Write>(w: &mut W) -> Result<()> {
         "Last refresh: {}",
         config.last_refresh.as_deref().unwrap_or("never")
     )?;
-    writeln!(w, "Config path: {}", SyncPolicyConfig::config_path().display())?;
+    writeln!(
+        w,
+        "Config path: {}",
+        SyncPolicyConfig::config_path().display()
+    )?;
     writeln!(w)?;
-    writeln!(w, "Note: Full IBD integration (policy engine, witness stripping) is Phase 1.")?;
-    writeln!(w, "This CLI manages registry subscriptions for when the feature is enabled.")?;
+    writeln!(
+        w,
+        "Note: Full IBD integration (policy engine, witness stripping) is Phase 1."
+    )?;
+    writeln!(
+        w,
+        "This CLI manages registry subscriptions for when the feature is enabled."
+    )?;
 
     Ok(())
 }
@@ -221,10 +255,11 @@ pub fn resolve_tx_hex(
             hash.copy_from_slice(&hash_bytes);
             let hash = blvm_node::Hash::from(hash);
             let tx = tokio::runtime::Handle::current().block_on(async move {
-                node_api.get_transaction(&hash).await.map_err(|e| {
-                    anyhow::anyhow!("Failed to fetch transaction from node: {}", e)
-                })?
-                .ok_or_else(|| anyhow::anyhow!("Transaction {} not found in node", s))
+                node_api
+                    .get_transaction(&hash)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to fetch transaction from node: {}", e))?
+                    .ok_or_else(|| anyhow::anyhow!("Transaction {} not found in node", s))
             })?;
             let serialized = serialize_transaction(&tx);
             return Ok(hex::encode(serialized));
@@ -289,7 +324,13 @@ fn run_export_registry<W: Write>(w: &mut W, output_path: Option<&str>) -> Result
     }))?;
     let path = output_path.unwrap_or("registry.json");
     std::fs::write(path, &json).context("Failed to write registry file")?;
-    writeln!(w, "Exported registry to {} ({} sources, {} entries)", path, config.registries.len(), index.entries.len())?;
+    writeln!(
+        w,
+        "Exported registry to {} ({} sources, {} entries)",
+        path,
+        config.registries.len(),
+        index.entries.len()
+    )?;
     Ok(())
 }
 

@@ -2,9 +2,7 @@
 //!
 //! Uses BLVM_DATA_DIR (checked first) and a mutex to avoid env races when tests run in parallel.
 
-use blvm_selective_sync::{
-    run_sync_policy_capture, SyncPolicyConfig, SyncPolicyCommand,
-};
+use blvm_selective_sync::{run_sync_policy_capture, SyncPolicyCommand, SyncPolicyConfig};
 use std::sync::Mutex;
 use tempfile::TempDir;
 
@@ -61,14 +59,20 @@ fn test_config_subscribe_unsubscribe() {
 #[test]
 fn test_config_apply_env_overrides() {
     with_temp_data_dir(|_dir| {
-        std::env::set_var("MODULE_CONFIG_REGISTRIES", "https://env1.com, https://env2.com");
+        std::env::set_var(
+            "MODULE_CONFIG_REGISTRIES",
+            "https://env1.com, https://env2.com",
+        );
         let mut config = SyncPolicyConfig::default();
         config.registries = vec!["https://file.com".to_string()];
         config.apply_env_overrides();
         std::env::remove_var("MODULE_CONFIG_REGISTRIES");
         assert_eq!(
             config.registries,
-            vec!["https://env1.com".to_string(), "https://env2.com".to_string()]
+            vec![
+                "https://env1.com".to_string(),
+                "https://env2.com".to_string()
+            ]
         );
     });
 }
@@ -111,7 +115,8 @@ fn test_run_sync_policy_capture_subscribe_and_list() {
         assert!(stderr.is_empty());
         assert!(stdout.contains("Subscribed to"));
 
-        let (stdout, _, code) = run_sync_policy_capture(SyncPolicyCommand::List, None).expect("capture");
+        let (stdout, _, code) =
+            run_sync_policy_capture(SyncPolicyCommand::List, None).expect("capture");
         assert_eq!(code, 0);
         assert!(stdout.contains("https://test-registry.example"));
     });

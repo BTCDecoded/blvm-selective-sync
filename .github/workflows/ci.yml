@@ -45,6 +45,67 @@ jobs:
           CACHE_ROOT="/tmp/runner-cache"
           mkdir -p "$CACHE_ROOT/cargo/$CACHE_KEY"/{registry,git} "$CACHE_ROOT/target/$CACHE_KEY"
 
+  quality:
+    name: Quality (fmt, clippy, test)
+    needs: setup
+    runs-on: [self-hosted, Linux, X64, builds]
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null ||
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]')))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Job-local HOME (Linux; avoid rustc ETXTBSY on shared rustup installs)
+        run: |
+          mkdir -p "${RUNNER_TEMP}/blvm-selective-sync-ci-home"
+          echo "HOME=${RUNNER_TEMP}/blvm-selective-sync-ci-home" >> "$GITHUB_ENV"
+
+      - name: Cache bind env (Linux self-hosted)
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}-quality
+
+      - name: Restore Cargo cache (Linux self-hosted)
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: restore
+
+      - name: Install Rust (Linux self-hosted)
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+
+      - name: Regenerate lockfile for crates.io graph
+        shell: bash
+        run: |
+          rm -f Cargo.lock
+          cargo generate-lockfile
+
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --all-targets
+
+      - name: test
+        run: cargo test --all-targets
+
+      - name: Save Cargo cache (Linux self-hosted)
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
+
+      - name: Prune old runner caches (Linux self-hosted)
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: prune
+
   build:
     name: Build ${{ matrix.target }}
     needs: setup

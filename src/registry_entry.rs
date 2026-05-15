@@ -70,7 +70,11 @@ pub fn infer_embedding_type(tx_hex: &str) -> Result<EmbeddingType> {
     }
 
     // OP_RETURN-based: BRC20 or explicit OP_RETURN > 80 bytes
-    if result.detected_types.iter().any(|t| matches!(t, SpamType::BRC20)) {
+    if result
+        .detected_types
+        .iter()
+        .any(|t| matches!(t, SpamType::BRC20))
+    {
         return Ok(EmbeddingType::OpReturn);
     }
     if has_large_op_return(&tx) {
@@ -89,14 +93,17 @@ fn has_large_op_return(tx: &blvm_protocol::Transaction) -> bool {
             // OP_RETURN (1) + push opcode (1) + length byte for OP_PUSHDATA1 (1) + 80 bytes = 83 min
             let data_len = match script.get(1) {
                 Some(0x4c) => script.get(2).copied().unwrap_or(0) as usize, // OP_PUSHDATA1
-                Some(0x4d) => u16::from_le_bytes([script.get(2).copied().unwrap_or(0), script.get(3).copied().unwrap_or(0)]) as usize, // OP_PUSHDATA2
+                Some(0x4d) => u16::from_le_bytes([
+                    script.get(2).copied().unwrap_or(0),
+                    script.get(3).copied().unwrap_or(0),
+                ]) as usize, // OP_PUSHDATA2
                 Some(0x4e) => u32::from_le_bytes([
                     script.get(2).copied().unwrap_or(0),
                     script.get(3).copied().unwrap_or(0),
                     script.get(4).copied().unwrap_or(0),
                     script.get(5).copied().unwrap_or(0),
                 ]) as usize, // OP_PUSHDATA4
-                Some(n) if *n <= 75 => *n as usize, // direct push
+                Some(n) if *n <= 75 => *n as usize,                         // direct push
                 _ => 0,
             };
             if data_len > 80 {
@@ -189,7 +196,10 @@ mod tests {
     fn test_infer_embedding_type_valid_tx() {
         let tx_hex = minimal_tx_hex();
         let result = infer_embedding_type(&tx_hex).expect("infer");
-        assert!(matches!(result, EmbeddingType::Witness | EmbeddingType::OpReturn));
+        assert!(matches!(
+            result,
+            EmbeddingType::Witness | EmbeddingType::OpReturn
+        ));
     }
 
     #[test]

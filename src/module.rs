@@ -2,9 +2,9 @@
 
 const ON_CHAIN_REGISTRY_TREE: &str = "on_chain_registry";
 
+use blvm_protocol::spam_filter::SpamFilterPreset;
 use blvm_sdk::module::prelude::*;
 use blvm_sdk_macros::module;
-use blvm_protocol::spam_filter::SpamFilterPreset;
 
 use crate::config::SyncPolicyConfig;
 use crate::registry_entry::{build_registry_from_block, infer_embedding_type, EmbeddingType};
@@ -17,13 +17,15 @@ pub struct SyncPolicyModule;
 impl SyncPolicyModule {
     #[command]
     fn list(&self, ctx: &InvocationContext) -> Result<String, ModuleError> {
-        let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
-            crate::cli::SyncPolicyCommand::List,
-            Some(ctx),
-        )
-        .map_err(|e| ModuleError::Other(e.to_string()))?;
+        let (stdout, stderr, code) =
+            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::List, Some(ctx))
+                .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
@@ -36,7 +38,11 @@ impl SyncPolicyModule {
         )
         .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
@@ -49,33 +55,41 @@ impl SyncPolicyModule {
         )
         .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
 
     #[command]
     fn refresh(&self, ctx: &InvocationContext) -> Result<String, ModuleError> {
-        let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
-            crate::cli::SyncPolicyCommand::Refresh,
-            Some(ctx),
-        )
-        .map_err(|e| ModuleError::Other(e.to_string()))?;
+        let (stdout, stderr, code) =
+            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::Refresh, Some(ctx))
+                .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
 
     #[command]
     fn status(&self, _ctx: &InvocationContext) -> Result<String, ModuleError> {
-        let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
-            crate::cli::SyncPolicyCommand::Status,
-            None,
-        )
-        .map_err(|e| ModuleError::Other(e.to_string()))?;
+        let (stdout, stderr, code) =
+            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::Status, None)
+                .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
@@ -90,10 +104,16 @@ impl SyncPolicyModule {
         let tx_hex = crate::cli::resolve_tx_hex(ctx, &tx_hex_or_txid)
             .map_err(|e| ModuleError::Other(e.to_string()))?;
         let embedding = match embedding.as_deref().unwrap_or("witness") {
-            "auto" => infer_embedding_type(&tx_hex).map_err(|e| ModuleError::Other(e.to_string()))?,
+            "auto" => {
+                infer_embedding_type(&tx_hex).map_err(|e| ModuleError::Other(e.to_string()))?
+            }
             "witness" => EmbeddingType::Witness,
             "op_return" => EmbeddingType::OpReturn,
-            _ => return Err(ModuleError::Other("embedding must be 'witness', 'op_return', or 'auto'".into())),
+            _ => {
+                return Err(ModuleError::Other(
+                    "embedding must be 'witness', 'op_return', or 'auto'".into(),
+                ))
+            }
         };
         let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
             crate::cli::SyncPolicyCommand::BuildEntry {
@@ -106,33 +126,47 @@ impl SyncPolicyModule {
         )
         .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
 
     #[command]
     fn config_path(&self, _ctx: &InvocationContext) -> Result<String, ModuleError> {
-        let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
-            crate::cli::SyncPolicyCommand::ConfigPath,
-            None,
-        )
-        .map_err(|e| ModuleError::Other(e.to_string()))?;
+        let (stdout, stderr, code) =
+            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::ConfigPath, None)
+                .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
 
     #[command]
-    fn export_registry(&self, _ctx: &InvocationContext, output_path: Option<String>) -> Result<String, ModuleError> {
+    fn export_registry(
+        &self,
+        _ctx: &InvocationContext,
+        output_path: Option<String>,
+    ) -> Result<String, ModuleError> {
         let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
             crate::cli::SyncPolicyCommand::ExportRegistry { output_path },
             None,
         )
         .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
@@ -150,7 +184,11 @@ impl SyncPolicyModule {
             "conservative" => SpamFilterPreset::Conservative,
             "moderate" => SpamFilterPreset::Moderate,
             "aggressive" => SpamFilterPreset::Aggressive,
-            _ => return Err(ModuleError::Other("preset must be 'conservative', 'moderate', or 'aggressive'".into())),
+            _ => {
+                return Err(ModuleError::Other(
+                    "preset must be 'conservative', 'moderate', or 'aggressive'".into(),
+                ))
+            }
         };
         let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
             crate::cli::SyncPolicyCommand::BuildRegistry {
@@ -163,15 +201,25 @@ impl SyncPolicyModule {
         )
         .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
-            return Err(ModuleError::Other(if stderr.is_empty() { stdout } else { stderr }));
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
         }
         Ok(stdout)
     }
 
     #[on_event(NewBlock)]
-    async fn on_new_block(&self, event: &blvm_node::module::ipc::protocol::EventMessage, ctx: &InvocationContext) -> Result<(), ModuleError> {
+    async fn on_new_block(
+        &self,
+        event: &blvm_node::module::ipc::protocol::EventMessage,
+        ctx: &InvocationContext,
+    ) -> Result<(), ModuleError> {
         let (block_hash, height) = match &event.payload {
-            blvm_node::module::ipc::protocol::EventPayload::NewBlock { block_hash, height, .. } => (block_hash, *height),
+            blvm_node::module::ipc::protocol::EventPayload::NewBlock {
+                block_hash, height, ..
+            } => (block_hash, *height),
             _ => return Ok(()),
         };
         let config = SyncPolicyConfig::load(SyncPolicyConfig::config_path()).unwrap_or_default();
@@ -186,11 +234,8 @@ impl SyncPolicyModule {
             Ok(Some(b)) => b,
             _ => return Ok(()),
         };
-        let empty_witnesses: Vec<Vec<blvm_protocol::segwit::Witness>> = block
-            .transactions
-            .iter()
-            .map(|_| Vec::new())
-            .collect();
+        let empty_witnesses: Vec<Vec<blvm_protocol::segwit::Witness>> =
+            block.transactions.iter().map(|_| Vec::new()).collect();
         let block_bytes = blvm_protocol::serialization::block::serialize_block_with_witnesses(
             &block,
             &empty_witnesses,

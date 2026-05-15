@@ -364,7 +364,7 @@ jobs:
 
           SHA_X86_LINUX=$(grep     "selective-sync-x86_64-linux$"   sha256sums.txt | awk '{print $1}')
           SHA_AARCH64_LINUX=$(grep "selective-sync-aarch64-linux$"  sha256sums.txt | awk '{print $1}')
-          SHA_X86_WINDOWS=$(grep   "blvm-zmq-x86_64-windows\.exe$" sha256sums.txt | awk '{print $1}')
+          SHA_X86_WINDOWS=$(grep   "selective-sync-x86_64-windows\.exe$" sha256sums.txt | awk '{print $1}')
 
           export VERSION_PLAIN BASE_URL SHA_X86_LINUX SHA_AARCH64_LINUX SHA_X86_WINDOWS
           python3 - <<'PYEOF'
