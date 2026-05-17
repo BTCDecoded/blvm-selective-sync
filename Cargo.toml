@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Bitcoin Commons Team"]
 description = "Selective sync: download policy for flagged transaction content during IBD"
 license = "MIT"
-repository = "https://github.com/BTCDecoded/blvm"
+repository = "https://github.com/BTCDecoded/blvm-selective-sync"
 homepage = "https://btcdecoded.org"
 keywords = ["bitcoin", "sync", "policy", "selective"]
 categories = ["cryptography::cryptocurrencies"]
@@ -33,7 +33,7 @@ toml = "0.8"
 hex = "=0.4"
 dirs = "5.0"
 # Module binary: connect to node, register CLI, handle invocations
-blvm-node = { version = ">=0.1, <1", default-features = false, features = ["redb", "production", "utxo-commitments"] }
+blvm-node = { version = ">=0.1, <1", default-features = false, features = ["redb", "production", "utxo-commitments", "sled"] }
 blvm-sdk = { version = ">=0.1, <1", default-features = false, features = ["node"] }
 tokio = { version = "1.35", features = ["full"] }
 reqwest = { version = "0.11", default-features = false, features = ["json"] }
