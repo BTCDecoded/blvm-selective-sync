@@ -1,5 +1,5 @@
 name = "blvm-selective-sync"
-version = "0.1.2"
+version = "0.1.3"
 description = "Selective sync: download policy for flagged transaction content during IBD"
 author = "Bitcoin Commons Team"
 entry_point = "selective-sync"
