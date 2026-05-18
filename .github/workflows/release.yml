@@ -343,66 +343,30 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Download build artifacts (for checksums)
-        uses: actions/download-artifact@v4
-        with:
-          path: artifact-dl/
-
-      - name: Merge sha256sums
-        run: find artifact-dl -name sha256sums.txt -print0 | xargs -0 cat | sort -u > sha256sums.txt
-
       - name: Download prepared Cargo manifests (overwrite workspace)
         uses: actions/download-artifact@v4
         with:
           name: release-cargo-manifests
 
-      - name: Patch module.toml (URLs + plain semver)
+      - name: Bump module.toml version (binaries + sha256sums.txt live on GitHub Releases only)
         env:
           VERSION_PLAIN: ${{ needs.prepare.outputs.version }}
-          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
         run: |
-          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION_TAG}"
-
-          SHA_X86_LINUX=$(grep     "selective-sync-x86_64-linux$"   sha256sums.txt | awk '{print $1}')
-          SHA_AARCH64_LINUX=$(grep "selective-sync-aarch64-linux$"  sha256sums.txt | awk '{print $1}')
-          SHA_X86_WINDOWS=$(grep   "selective-sync-x86_64-windows\.exe$" sha256sums.txt | awk '{print $1}')
-
-          export VERSION_PLAIN BASE_URL SHA_X86_LINUX SHA_AARCH64_LINUX SHA_X86_WINDOWS
           python3 - <<'PYEOF'
-          import re, pathlib, os
-
-          version_plain = os.environ["VERSION_PLAIN"]
-          base_url = os.environ["BASE_URL"]
-
-          platforms = {
-              "x86_64-linux":   ("selective-sync-x86_64-linux",   os.environ["SHA_X86_LINUX"]),
-              "aarch64-linux":  ("selective-sync-aarch64-linux",  os.environ["SHA_AARCH64_LINUX"]),
-              "x86_64-windows": ("selective-sync-x86_64-windows.exe", os.environ["SHA_X86_WINDOWS"]),
-          }
-
+          import os, pathlib, re
+          ver = os.environ["VERSION_PLAIN"]
           p = pathlib.Path("module.toml")
           text = p.read_text()
-
           text = re.sub(
               r'^(version\s*=\s*)"[^"]*"',
-              rf'\g<1>"{version_plain}"',
-              text, flags=re.MULTILINE
+              rf'\1"{ver}"',
+              text,
+              flags=re.MULTILINE,
           )
-
-          lines = ["\n[downloads]"]
-          for key, (artifact, sha) in platforms.items():
-              url = f"{base_url}/{artifact}"
-              lines.append(f'{key:<14}= {{ url = "{url}", sha256 = "{sha}" }}')
-          new_downloads = "\n".join(lines) + "\n"
-
-          if "[downloads]" in text:
-              text = re.sub(r'\n\[downloads\].*', new_downloads, text, flags=re.DOTALL)
-          else:
-              text = text.rstrip("\n") + new_downloads
-
           p.write_text(text)
-          print(f"module.toml updated: version={version_plain}")
+          print("module.toml version ->", ver)
           PYEOF
+
 
       - name: Commit and push
         env:
