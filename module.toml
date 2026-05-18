@@ -8,9 +8,3 @@ capabilities = [
     "read_blockchain",
     "subscribe_events",
 ]
-
-# CI fills url/sha256 on release — artifact names use `selective-sync-*` (binary name).
-[downloads]
-x86_64-linux  = { url = "https://github.com/BTCDecoded/blvm-selective-sync/releases/download/v0.1.2/selective-sync-x86_64-linux", sha256 = "0fd01303448d84dcfd8b1831909a0ffbe3a935c29bb9d81923a8162a04897eda" }
-aarch64-linux = { url = "https://github.com/BTCDecoded/blvm-selective-sync/releases/download/v0.1.2/selective-sync-aarch64-linux", sha256 = "f19349f305d421deaa25f18d96f174370fd476b063149932b4e3d5e1e5578e12" }
-x86_64-windows= { url = "https://github.com/BTCDecoded/blvm-selective-sync/releases/download/v0.1.2/selective-sync-x86_64-windows.exe", sha256 = "a06e2b3584ad9f9d5d1ec5a583e5a89e9641fb568a11bb60894b9bb7da3a725a" }
