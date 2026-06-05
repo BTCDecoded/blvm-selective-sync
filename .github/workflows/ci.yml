@@ -30,7 +30,7 @@ jobs:
       - name: Disk check
         uses: BTCDecoded/rust-ci/runner-disk-guard@main
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
@@ -55,7 +55,7 @@ jobs:
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]')))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
@@ -130,7 +130,7 @@ jobs:
             use_cross: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main

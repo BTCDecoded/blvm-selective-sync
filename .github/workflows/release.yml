@@ -37,7 +37,7 @@ jobs:
        !contains(github.event.head_commit.message, '[ci skip]') &&
        !contains(github.event.head_commit.message, '[skip release]'))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -133,7 +133,7 @@ jobs:
           echo "Releasing ${VERSION} (tag v${VERSION})"
 
       - name: Upload Cargo.toml + Cargo.lock for matrix builds
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-cargo-manifests
           path: |
@@ -166,10 +166,10 @@ jobs:
             use_cross: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore prepared Cargo manifests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: release-cargo-manifests
 
@@ -275,7 +275,7 @@ jobs:
           operation: prune
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact_name }}
           path: |
@@ -288,10 +288,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download build + manifest artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts/
 
@@ -338,13 +338,13 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
 
       - name: Download prepared Cargo manifests (overwrite workspace)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: release-cargo-manifests
 
