@@ -47,6 +47,9 @@ pub struct SyncPolicyConfig {
     /// When true, subscribe to NewBlock and build local registry from each block.
     #[serde(default)]
     pub on_chain_registry_builder: bool,
+    /// When true, strip flagged witness data during IBD block persistence.
+    #[serde(default)]
+    pub ibd_filter_enabled: bool,
 }
 
 impl SyncPolicyConfig {

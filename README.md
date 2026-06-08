@@ -1,46 +1,68 @@
 # blvm-selective-sync
 
-BLVM module: selective sync — a download policy for flagged transaction content during initial block download (IBD).
+BLVM module: selective sync — download policy for flagged transaction content during initial block download (IBD) and on the P2P serve path.
 
-Part of [Bitcoin Commons](https://btcdecoded.org) BLVM. Loaded by the blvm node as a subprocess module. Lets node operators avoid downloading content that is marked as flagged (e.g. by policy or compliance) while still maintaining full cryptographic validity of the chain.
+Part of [Bitcoin Commons](https://btcdecoded.org) BLVM. Loaded by the node as a subprocess module.
 
 ## What it does
 
-- **Sync policy** — Configurable rules (e.g. `sync-policy.json`) that determine which transaction outputs or content are skipped during IBD.
-- **Module API** — Registers with the node via the BLVM module system (CLI subcommands, config path, status).
-- **CLI** — Commands such as `status`, `config-path`, and policy capture for testing.
+- **Registry policy** — Subscribe to remote registry URLs; quorum-merge entries into module-local storage.
+- **P2P serve policy** — `apply` pushes merged tx/block hashes to node serve denylists (`merge_*_serve_denylist`).
+- **IBD witness filter** — When `ibd_filter_enabled = true`, strips flagged witness stacks before the node persists blocks during IBD (`filter_block_before_store` ModuleAPI).
+- **On-chain indexer** — Optional `on_chain_registry_builder` builds a local registry from `NewBlock` events.
+- **CLI** — `blvm sync-policy …` subcommands (list, subscribe, refresh, apply, status, export-registry, build-entry, build-registry).
 
-Typically used in a workspace that also contains **blvm-node**, **blvm-sdk**, and **blvm-protocol** (path dependencies).
+## Quick start
 
-## Usage
-
-Load the module when running the node (e.g. via `config.toml` or `blvm module load blvm-selective-sync`). Configure the sync policy in the path reported by `config-path` (e.g. `sync-policy.json` in the module data dir).
-
-## Building
-
-From a workspace that includes blvm-node, blvm-sdk, and blvm-protocol:
+1. Load the module (`config.toml` `enabled_modules` or `blvm module load selective-sync`).
+2. Subscribe and refresh:
 
 ```bash
-cargo build -p blvm-selective-sync
+blvm sync-policy subscribe https://example.com/registry.json
+blvm sync-policy refresh    # fetch + quorum merge + auto-apply denylists
+blvm sync-policy apply      # re-apply denylists without fetch
+blvm sync-policy status
 ```
 
-Or from this directory (with path deps resolved):
+3. Enable IBD filtering in module `config.toml` (path from `blvm sync-policy config-path`):
+
+```toml
+ibd_filter_enabled = true
+witness_mode = "strict"   # or "relaxed"
+```
+
+Node `[modules.selective-sync]` can override these keys via the SDK `#[config]` macro.
+
+## Capabilities (`module.toml`)
+
+```toml
+read_blockchain
+subscribe_events
+register_module_api
+network_access
+read_network
+publish_events
+```
+
+## Building
 
 ```bash
 cargo build
 cargo test
 ```
 
+Local monorepo builds use `[patch.crates-io]` sibling paths (stripped in CI/release).
+
 ## Design
 
-See the design doc in the main BLVM/docs tree (e.g. `docs/blvm-selective-sync-module.md` or equivalent) for the full design and policy format.
+See [docs/DESIGN.md](docs/DESIGN.md) for architecture, config keys, and ModuleAPI contract.
 
 ## License
 
-MIT. See [LICENSE](LICENSE) if present.
+MIT
 
 ## Links
 
 - [Bitcoin Commons](https://btcdecoded.org)
-- [blvm](https://github.com/BTCDecoded/blvm) — node binary that loads this module
-- [blvm-sdk](https://github.com/BTCDecoded/blvm-sdk) — module API used by this crate
+- [blvm](https://github.com/BTCDecoded/blvm)
+- [blvm-sdk](https://github.com/BTCDecoded/blvm-sdk)

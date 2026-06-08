@@ -5,10 +5,18 @@
 //!
 //! See docs/blvm-selective-sync-module.md for the full design.
 
+pub mod apply_policy;
+pub mod audit;
 pub mod cli;
 pub mod config;
+pub mod db;
+pub mod ibd_filter;
 pub mod module;
+pub mod module_api;
+pub mod ops;
+pub mod policy_store;
 pub mod registry_entry;
+pub mod registry_fetch;
 pub mod withheld;
 
 pub use cli::{run_sync_policy, run_sync_policy_capture, SyncPolicyCommand};

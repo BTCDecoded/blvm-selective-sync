@@ -1,6 +1,6 @@
 //! Sync-policy module: unified CLI via #[module] macro.
 
-const ON_CHAIN_REGISTRY_TREE: &str = "on_chain_registry";
+use crate::policy_store::ON_CHAIN_REGISTRY_TREE;
 
 use blvm_protocol::spam_filter::SpamFilterPreset;
 use blvm_sdk::module::prelude::*;
@@ -80,9 +80,24 @@ impl SyncPolicyModule {
     }
 
     #[command]
-    fn status(&self, _ctx: &InvocationContext) -> Result<String, ModuleError> {
+    fn apply(&self, ctx: &InvocationContext) -> Result<String, ModuleError> {
         let (stdout, stderr, code) =
-            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::Status, None)
+            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::Apply, Some(ctx))
+                .map_err(|e| ModuleError::Other(e.to_string()))?;
+        if code != 0 {
+            return Err(ModuleError::Other(if stderr.is_empty() {
+                stdout
+            } else {
+                stderr
+            }));
+        }
+        Ok(stdout)
+    }
+
+    #[command]
+    fn status(&self, ctx: &InvocationContext) -> Result<String, ModuleError> {
+        let (stdout, stderr, code) =
+            crate::cli::run_sync_policy_capture(crate::cli::SyncPolicyCommand::Status, Some(ctx))
                 .map_err(|e| ModuleError::Other(e.to_string()))?;
         if code != 0 {
             return Err(ModuleError::Other(if stderr.is_empty() {
@@ -216,7 +231,7 @@ impl SyncPolicyModule {
         event: &blvm_node::module::ipc::protocol::EventMessage,
         ctx: &InvocationContext,
     ) -> Result<(), ModuleError> {
-        let (block_hash, height) = match &event.payload {
+        let (_block_hash, height) = match &event.payload {
             blvm_node::module::ipc::protocol::EventPayload::NewBlock {
                 block_hash, height, ..
             } => (block_hash, *height),

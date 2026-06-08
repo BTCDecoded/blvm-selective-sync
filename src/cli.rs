@@ -6,7 +6,11 @@ use blvm_protocol::serialization::transaction::serialize_transaction;
 use std::io::Write;
 
 use crate::config::SyncPolicyConfig;
+use crate::db::open_policy_db;
+use crate::ops::{refresh_and_apply, RefreshAndApplyResult};
+use crate::policy_store::{export_document, load_merged_entries};
 use crate::registry_entry::{build_registry_entry, build_registry_from_block, EmbeddingType};
+use crate::withheld::{get_block_serve_denylist_snapshot, get_tx_serve_denylist_snapshot};
 use blvm_protocol::spam_filter::SpamFilterPreset;
 
 /// Sync-policy subcommand variants.
@@ -20,6 +24,7 @@ pub enum SyncPolicyCommand {
         url: String,
     },
     Refresh,
+    Apply,
     Status,
     BuildEntry {
         tx_hex: String,
@@ -66,7 +71,8 @@ fn run_sync_policy_impl<W: Write>(
         SyncPolicyCommand::Subscribe { url } => run_subscribe(w, &url, ctx),
         SyncPolicyCommand::Unsubscribe { url } => run_unsubscribe(w, &url, ctx),
         SyncPolicyCommand::Refresh => run_refresh(w, ctx),
-        SyncPolicyCommand::Status => run_status(w),
+        SyncPolicyCommand::Apply => run_apply(w, ctx),
+        SyncPolicyCommand::Status => run_status(w, ctx),
         SyncPolicyCommand::BuildEntry {
             tx_hex,
             embedding,
@@ -166,21 +172,71 @@ fn run_refresh<W: Write>(
         )?;
         return Ok(());
     }
-    // TODO: fetch from each registry URL, aggregate entries
-    config.last_refresh = Some(now_iso());
-    config.save()?;
+
+    let db = open_policy_db()?;
+    let node_api = ctx.and_then(|c| c.node_api());
+    let result: RefreshAndApplyResult = tokio::runtime::Handle::current().block_on(async {
+        refresh_and_apply(db.as_db().as_ref(), &mut config, node_api.as_deref()).await
+    })?;
+
+    writeln!(w, "✓ Refresh complete")?;
     writeln!(
         w,
-        "✓ Refresh triggered (registry fetch not yet implemented)"
+        "  Fetched: {} registries ({} failed)",
+        result.refresh.urls_fetched,
+        result.refresh.urls_failed.len()
     )?;
+    writeln!(
+        w,
+        "  Policy entries stored: {}",
+        result.refresh.entries_stored
+    )?;
+    if !result.refresh.urls_failed.is_empty() {
+        for (url, err) in &result.refresh.urls_failed {
+            writeln!(w, "  ! {url}: {err}")?;
+        }
+    }
     writeln!(
         w,
         "  Last refresh: {}",
         config.last_refresh.as_deref().unwrap_or("never")
     )?;
+    if let Some(apply) = &result.apply {
+        writeln!(
+            w,
+            "  Applied: {} tx denylist, {} block denylist",
+            apply.tx_count, apply.block_count
+        )?;
+    }
     if let Some(c) = ctx {
         publish_selective_sync_policy_applied(c, "refresh", config.registries.len());
     }
+    Ok(())
+}
+
+fn run_apply<W: Write>(
+    w: &mut W,
+    ctx: Option<&blvm_sdk::module::runner::InvocationContext>,
+) -> Result<()> {
+    let config = SyncPolicyConfig::load(SyncPolicyConfig::config_path())?;
+    let Some(c) = ctx else {
+        writeln!(w, "apply requires a running module with node API access")?;
+        return Ok(());
+    };
+    let Some(node_api) = c.node_api() else {
+        writeln!(w, "apply requires node API access")?;
+        return Ok(());
+    };
+
+    let db = open_policy_db()?;
+    let report = tokio::runtime::Handle::current().block_on(async {
+        crate::apply_policy::apply_policy(node_api.as_ref(), db.as_db().as_ref(), &config).await
+    })?;
+
+    writeln!(w, "✓ Policy applied to node serve denylists")?;
+    writeln!(w, "  Tx denylist entries merged: {}", report.tx_count)?;
+    writeln!(w, "  Block denylist entries merged: {}", report.block_count)?;
+    publish_selective_sync_policy_applied(c, "apply", config.registries.len());
     Ok(())
 }
 
@@ -201,16 +257,13 @@ fn publish_selective_sync_policy_applied(
     }
 }
 
-fn now_iso() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| format!("{}", d.as_secs()))
-        .unwrap_or_else(|_| "unknown".to_string())
-}
-
-fn run_status<W: Write>(w: &mut W) -> Result<()> {
+fn run_status<W: Write>(
+    w: &mut W,
+    ctx: Option<&blvm_sdk::module::runner::InvocationContext>,
+) -> Result<()> {
     let config = SyncPolicyConfig::load(SyncPolicyConfig::config_path())?;
+    let db = open_policy_db()?;
+    let merged = load_merged_entries(db.as_db().as_ref())?;
 
     writeln!(w, "Sync policy status")?;
     writeln!(w, "==================")?;
@@ -220,19 +273,67 @@ fn run_status<W: Write>(w: &mut W) -> Result<()> {
         "Last refresh: {}",
         config.last_refresh.as_deref().unwrap_or("never")
     )?;
+    writeln!(w, "Policy entries (merged): {}", merged.len())?;
+    writeln!(w, "Witness mode: {}", config.witness_mode)?;
+    writeln!(w, "IBD filter enabled: {}", config.ibd_filter_enabled)?;
+    writeln!(
+        w,
+        "On-chain registry builder: {}",
+        config.on_chain_registry_builder
+    )?;
+    writeln!(
+        w,
+        "Registry refresh interval: {}s",
+        config.registry_refresh_interval
+    )?;
     writeln!(
         w,
         "Config path: {}",
         SyncPolicyConfig::config_path().display()
     )?;
+
+    if let Some(c) = ctx {
+        if let Some(node_api) = c.node_api() {
+            let (tx_snap, block_snap) = tokio::runtime::Handle::current().block_on(async {
+                let tx = get_tx_serve_denylist_snapshot(node_api.as_ref()).await.ok();
+                let block = get_block_serve_denylist_snapshot(node_api.as_ref())
+                    .await
+                    .ok();
+                (tx, block)
+            });
+            if let Some(tx) = tx_snap {
+                writeln!(w)?;
+                writeln!(
+                    w,
+                    "Tx serve denylist: {} total{}",
+                    tx.total_count,
+                    if tx.truncated {
+                        " (snapshot truncated)"
+                    } else {
+                        ""
+                    }
+                )?;
+            }
+            if let Some(block) = block_snap {
+                writeln!(
+                    w,
+                    "Block serve denylist: {} total{}",
+                    block.total_count,
+                    if block.truncated {
+                        " (snapshot truncated)"
+                    } else {
+                        ""
+                    }
+                )?;
+            }
+        }
+    }
+
     writeln!(w)?;
     writeln!(
         w,
-        "Note: Full IBD integration (policy engine, witness stripping) is Phase 1."
-    )?;
-    writeln!(
-        w,
-        "This CLI manages registry subscriptions for when the feature is enabled."
+        "IBD witness filtering: filter_block_before_store ModuleAPI (enabled={})",
+        config.ibd_filter_enabled
     )?;
 
     Ok(())
@@ -316,12 +417,9 @@ fn run_build_registry<W: Write>(
 
 fn run_export_registry<W: Write>(w: &mut W, output_path: Option<&str>) -> Result<()> {
     let config = SyncPolicyConfig::load(SyncPolicyConfig::config_path())?;
-    let index = crate::registry_entry::RegistryIndex { entries: vec![] };
-    let json = serde_json::to_string_pretty(&serde_json::json!({
-        "entries": index.entries,
-        "sources": config.registries,
-        "last_refresh": config.last_refresh,
-    }))?;
+    let db = open_policy_db()?;
+    let doc = export_document(db.as_db().as_ref(), &config)?;
+    let json = serde_json::to_string_pretty(&doc)?;
     let path = output_path.unwrap_or("registry.json");
     std::fs::write(path, &json).context("Failed to write registry file")?;
     writeln!(
@@ -329,7 +427,7 @@ fn run_export_registry<W: Write>(w: &mut W, output_path: Option<&str>) -> Result
         "Exported registry to {} ({} sources, {} entries)",
         path,
         config.registries.len(),
-        index.entries.len()
+        doc.entries.len()
     )?;
     Ok(())
 }

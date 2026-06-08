@@ -187,9 +187,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.12.1"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84d7ced0ae9557296835c32bf1b1e02b44c746701f898460fb000d7eaa84f00a"
+checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
 name = "blake2b-rs"
@@ -212,9 +212,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-consensus"
-version = "0.1.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a03721dbc0809ebc32311d4019f28b630cf1719959f76d98135d41e2e48ebe66"
+version = "0.1.27"
 dependencies = [
  "bitcoin_hashes",
  "blvm-primitives",
@@ -237,8 +235,6 @@ dependencies = [
 [[package]]
 name = "blvm-muhash"
 version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12b488787aed02ee7c5cd8a7bdf2f855e7b7d0678f745a25236041cd35f225b5"
 dependencies = [
  "chacha20",
  "cipher",
@@ -248,15 +244,13 @@ dependencies = [
 
 [[package]]
 name = "blvm-node"
-version = "0.1.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d98eba625360c14ae2726194d3074a6679ef370e66f7e2030ff2ed253fb4051a"
+version = "0.1.13"
 dependencies = [
  "aes-gcm",
  "anyhow",
  "async-trait",
  "bincode",
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "blvm-consensus",
  "blvm-muhash",
  "blvm-protocol",
@@ -309,8 +303,6 @@ dependencies = [
 [[package]]
 name = "blvm-primitives"
 version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3bc3e3b2fed2a0bc3db37c0949eac246102942bcd6b26dd70497790147d3b11"
 dependencies = [
  "bitcoin_hashes",
  "ripemd",
@@ -324,9 +316,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-protocol"
-version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9036fd5eb4389c2117284a49702ddda80f046b13756823e5b72cde5746ac1e74"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "bech32",
@@ -350,9 +340,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-sdk"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d959e5f1ca38709f9d4e05a6b5673ceb53bd465ffdc2aa8b9ef15745566ee868"
+version = "0.1.13"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
@@ -377,9 +365,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-sdk-macros"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "874142f69615ac9afc755b07857b6d4106810f6eb145aa09ec0d77f43c0ac454"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -389,8 +375,6 @@ dependencies = [
 [[package]]
 name = "blvm-secp256k1"
 version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc9513252ff9e32d43aea795415ac804dff166a4800bc1902f855a58d388ba69"
 dependencies = [
  "cc",
  "num-bigint",
@@ -404,6 +388,8 @@ name = "blvm-selective-sync"
 version = "0.1.5"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "bincode",
  "blvm-node",
  "blvm-protocol",
  "blvm-sdk",
@@ -422,9 +408,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-spec-lock"
-version = "0.1.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5182d14ddd64a2649c171434a7cad78f496e67b726462bc9b0016407f0f6520f"
+version = "0.1.28"
 dependencies = [
  "anyhow",
  "clap",
@@ -1428,7 +1412,7 @@ version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d09b98f7eace8982db770e4408e7470b028ce513ac28fecdc6bf4c30fe92b62"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "cfg-if 1.0.4",
  "libc",
 ]
@@ -1609,7 +1593,7 @@ version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "cfg-if 1.0.4",
  "cfg_aliases",
  "libc",
@@ -1685,7 +1669,7 @@ version = "0.10.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a45fa2aa886c42762255da344f0a0d313e254066c46aad76f300c3d3da62d967"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "cfg-if 1.0.4",
  "foreign-types",
  "libc",
@@ -1948,7 +1932,7 @@ version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
 ]
 
 [[package]]
@@ -2102,7 +2086,7 @@ version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -2175,7 +2159,7 @@ version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7f4bc775c73d9a02cde8bf7b2ec4c9d12743edf609006c7facc23998404cd1d"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "core-foundation 0.10.1",
  "core-foundation-sys",
  "libc",
@@ -2482,7 +2466,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c879d448e9d986b661742763247d3693ed13609438cf3d006f51f5368a5ba6b"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "core-foundation 0.9.4",
  "system-configuration-sys 0.6.0",
 ]
@@ -2675,7 +2659,7 @@ version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "bytes",
  "futures-util",
  "http 1.1.0",
@@ -2958,7 +2942,7 @@ version = "0.244.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47b807c72e1bac69382b3a6fb3dbe8ea4c0ed87ff5629b8685ae6b9a611028fe"
 dependencies = [
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
@@ -3325,7 +3309,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d66ea20e9553b30172b5e831994e35fbde2d165325bec84fc43dbf6f4eb9cb2"
 dependencies = [
  "anyhow",
- "bitflags 2.12.1",
+ "bitflags 2.13.0",
  "indexmap",
  "log",
  "serde",
