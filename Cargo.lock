@@ -212,7 +212,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-consensus"
-version = "0.1.27"
+version = "0.1.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "842d32e29449a957fee0e79a5d69dd1b99ca4c7ff54a857e5a6f52968625081c"
 dependencies = [
  "bitcoin_hashes",
  "blvm-primitives",
@@ -234,7 +236,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-muhash"
-version = "0.1.7"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8bbfd70ce64367a3e43991c1a2035c67c6f8f6e3934a06dafd91b5381bad6a3"
 dependencies = [
  "chacha20",
  "cipher",
@@ -244,7 +248,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-node"
-version = "0.1.13"
+version = "0.1.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae682e8dd047a03e13b702a876ebadaaa35d3dd92788daa667fc2a789b81d2c5"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -303,6 +309,8 @@ dependencies = [
 [[package]]
 name = "blvm-primitives"
 version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3bc3e3b2fed2a0bc3db37c0949eac246102942bcd6b26dd70497790147d3b11"
 dependencies = [
  "bitcoin_hashes",
  "ripemd",
@@ -316,7 +324,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-protocol"
-version = "0.1.8"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9036fd5eb4389c2117284a49702ddda80f046b13756823e5b72cde5746ac1e74"
 dependencies = [
  "anyhow",
  "bech32",
@@ -340,7 +350,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-sdk"
-version = "0.1.13"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7873fb501887518e0d2909f00ba0abb8ac282481dd4e6e199dce5c3d7a58869"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
@@ -365,7 +377,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-sdk-macros"
-version = "0.1.0"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34d9854314f87e01ac70761d9906a2840eb6d7745b1958b4b4723325b35ecd85"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -374,7 +388,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-secp256k1"
-version = "0.1.8"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c00b77dbf105111fe0e7ead0c84971470643bac7703d9cb1bc6fdbbd6bc42c"
 dependencies = [
  "cc",
  "num-bigint",
@@ -385,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-selective-sync"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -408,7 +424,9 @@ dependencies = [
 
 [[package]]
 name = "blvm-spec-lock"
-version = "0.1.28"
+version = "0.1.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2de44a8d567b9d12bc7d8477badb3f2c7b9a86be0e15cd77ea4bae495c1a7f48"
 dependencies = [
  "anyhow",
  "clap",

@@ -1,6 +1,6 @@
 [package]
 name = "blvm-selective-sync"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["Bitcoin Commons Team"]
 description = "Selective sync: download policy for flagged transaction content during IBD"
@@ -44,13 +44,3 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Local monorepo: sibling paths override the version pins above.
 # Strip this section in CI/release (BTCDecoded/rust-ci/strip-patch-crates-io@main).
-[patch.crates-io]
-blvm-node = { path = "../blvm-node" }
-blvm-secp256k1 = { path = "../blvm-secp256k1" }
-blvm-protocol = { path = "../blvm-protocol" }
-blvm-consensus = { path = "../blvm-consensus" }
-blvm-primitives = { path = "../blvm-primitives" }
-blvm-muhash = { path = "../blvm-muhash" }
-blvm-spec-lock = { path = "../blvm-spec-lock" }
-blvm-sdk = { path = "../blvm-sdk" }
-blvm-sdk-macros = { path = "../blvm-sdk/crates/blvm-sdk-macros" }
