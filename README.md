@@ -14,7 +14,7 @@ Part of [Bitcoin Commons](https://btcdecoded.org) BLVM. Loaded by the node as a 
 
 ## Quick start
 
-1. Load the module (`config.toml` `enabled_modules` or `blvm module load selective-sync`).
+1. Load the module (`blvm-selective-sync = "0.1.*"` in `[modules]`, or `blvm module load selective-sync`).
 2. Subscribe and refresh:
 
 ```bash
