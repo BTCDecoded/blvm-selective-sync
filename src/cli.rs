@@ -57,7 +57,7 @@ pub fn run_sync_policy_capture(
     let mut out = Vec::new();
     match run_sync_policy_impl(cmd, &mut out, ctx) {
         Ok(()) => Ok((String::from_utf8(out)?, String::new(), 0)),
-        Err(e) => Ok((String::new(), format!("{}\n", e), 1)),
+        Err(e) => Ok((String::new(), format!("{e}\n"), 1)),
     }
 }
 
@@ -117,7 +117,7 @@ fn run_list<W: Write>(w: &mut W) -> Result<()> {
     }
     if let Some(ref t) = config.last_refresh {
         writeln!(w)?;
-        writeln!(w, "Last refresh: {}", t)?;
+        writeln!(w, "Last refresh: {t}")?;
     }
 
     Ok(())
@@ -378,7 +378,7 @@ fn run_build_entry<W: Write>(
 ) -> Result<()> {
     let entry = build_registry_entry(tx_hex, embedding, block_height, block_position)?;
     let json = serde_json::to_string_pretty(&entry)?;
-    writeln!(w, "{}", json)?;
+    writeln!(w, "{json}")?;
     Ok(())
 }
 
@@ -393,13 +393,11 @@ fn run_build_registry<W: Write>(
         std::fs::read_to_string(block_hex_or_path)
             .context("Failed to read block file")?
             .trim()
-            .replace('\n', "")
-            .replace(' ', "")
+            .replace(['\n', ' '], "")
     } else {
         block_hex_or_path
             .trim()
-            .replace('\n', "")
-            .replace(' ', "")
+            .replace(['\n', ' '], "")
             .to_string()
     };
 
@@ -410,7 +408,7 @@ fn run_build_registry<W: Write>(
         std::fs::write(path, &json).context("Failed to write output file")?;
         writeln!(w, "Wrote {} entries to {}", index.entries.len(), path)?;
     } else {
-        writeln!(w, "{}", json)?;
+        writeln!(w, "{json}")?;
     }
     Ok(())
 }

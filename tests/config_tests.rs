@@ -40,9 +40,11 @@ fn test_config_load_default_when_missing() {
 #[test]
 fn test_config_save_and_load() {
     with_temp_data_dir(|_dir| {
-        let mut config = SyncPolicyConfig::default();
-        config.registries = vec!["https://registry.example.com".to_string()];
-        config.last_refresh = Some("12345".to_string());
+        let config = SyncPolicyConfig {
+            registries: vec!["https://registry.example.com".to_string()],
+            last_refresh: Some("12345".to_string()),
+            ..Default::default()
+        };
         config.save().expect("save");
 
         let loaded = SyncPolicyConfig::load(SyncPolicyConfig::config_path()).expect("load");
@@ -71,8 +73,10 @@ fn test_config_apply_env_overrides() {
             "MODULE_CONFIG_REGISTRIES",
             "https://env1.com, https://env2.com",
         );
-        let mut config = SyncPolicyConfig::default();
-        config.registries = vec!["https://file.com".to_string()];
+        let mut config = SyncPolicyConfig {
+            registries: vec!["https://file.com".to_string()],
+            ..Default::default()
+        };
         config.apply_env_overrides();
         env_remove("MODULE_CONFIG_REGISTRIES");
         assert_eq!(

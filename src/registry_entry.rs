@@ -175,16 +175,16 @@ mod tests {
             version: 1,
             inputs: vec![TransactionInput {
                 prevout: OutPoint {
-                    hash: [1u8; 32].into(),
+                    hash: [1u8; 32],
                     index: 0,
                 },
-                script_sig: vec![0x51].into(),
+                script_sig: vec![0x51],
                 sequence: 0xffffffff,
             }]
             .into(),
             outputs: vec![TransactionOutput {
                 value: 5000000000,
-                script_pubkey: vec![0x51].into(),
+                script_pubkey: vec![0x51],
             }]
             .into(),
             lock_time: 0,

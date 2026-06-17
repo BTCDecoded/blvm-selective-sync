@@ -62,9 +62,9 @@ impl ModuleAPI for SelectiveSyncModuleAPI {
                 stripped_txids: vec![],
                 filtered: false,
             };
-            return Ok(bincode::serialize(&response).map_err(|e| {
+            return bincode::serialize(&response).map_err(|e| {
                 ModuleError::SerializationError(format!("Failed to serialize response: {e}"))
-            })?);
+            });
         }
 
         debug!(
