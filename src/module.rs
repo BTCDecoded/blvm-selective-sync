@@ -7,7 +7,7 @@ use blvm_sdk::module::prelude::*;
 use blvm_sdk_macros::module;
 
 use crate::config::SyncPolicyConfig;
-use crate::registry_entry::{build_registry_from_block, infer_embedding_type, EmbeddingType};
+use crate::registry_entry::{EmbeddingType, build_registry_from_block, infer_embedding_type};
 
 /// Sync-policy module: CLI + event handler in one struct.
 #[derive(Clone)]
@@ -127,7 +127,7 @@ impl SyncPolicyModule {
             _ => {
                 return Err(ModuleError::Other(
                     "embedding must be 'witness', 'op_return', or 'auto'".into(),
-                ))
+                ));
             }
         };
         let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(
@@ -202,7 +202,7 @@ impl SyncPolicyModule {
             _ => {
                 return Err(ModuleError::Other(
                     "preset must be 'conservative', 'moderate', or 'aggressive'".into(),
-                ))
+                ));
             }
         };
         let (stdout, stderr, code) = crate::cli::run_sync_policy_capture(

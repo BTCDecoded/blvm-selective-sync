@@ -2,11 +2,19 @@
 //!
 //! Uses BLVM_DATA_DIR (checked first) and a mutex to avoid env races when tests run in parallel.
 
-use blvm_selective_sync::{run_sync_policy_capture, SyncPolicyCommand, SyncPolicyConfig};
+use blvm_selective_sync::{SyncPolicyCommand, SyncPolicyConfig, run_sync_policy_capture};
 use std::sync::Mutex;
 use tempfile::TempDir;
 
 static CONFIG_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+fn env_set(key: &str, value: impl AsRef<std::ffi::OsStr>) {
+    unsafe { std::env::set_var(key, value) }
+}
+
+fn env_remove(key: &str) {
+    unsafe { std::env::remove_var(key) }
+}
 
 fn with_temp_data_dir<T, F>(f: F) -> T
 where
@@ -14,9 +22,9 @@ where
 {
     let _guard = CONFIG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = tempfile::tempdir().expect("tempdir");
-    std::env::set_var("BLVM_DATA_DIR", dir.path());
+    env_set("BLVM_DATA_DIR", dir.path());
     let result = f(&dir);
-    std::env::remove_var("BLVM_DATA_DIR");
+    env_remove("BLVM_DATA_DIR");
     result
 }
 
@@ -59,14 +67,14 @@ fn test_config_subscribe_unsubscribe() {
 #[test]
 fn test_config_apply_env_overrides() {
     with_temp_data_dir(|_dir| {
-        std::env::set_var(
+        env_set(
             "MODULE_CONFIG_REGISTRIES",
             "https://env1.com, https://env2.com",
         );
         let mut config = SyncPolicyConfig::default();
         config.registries = vec!["https://file.com".to_string()];
         config.apply_env_overrides();
-        std::env::remove_var("MODULE_CONFIG_REGISTRIES");
+        env_remove("MODULE_CONFIG_REGISTRIES");
         assert_eq!(
             config.registries,
             vec![

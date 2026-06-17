@@ -7,9 +7,9 @@ use std::io::Write;
 
 use crate::config::SyncPolicyConfig;
 use crate::db::open_policy_db;
-use crate::ops::{refresh_and_apply, RefreshAndApplyResult};
+use crate::ops::{RefreshAndApplyResult, refresh_and_apply};
 use crate::policy_store::{export_document, load_merged_entries};
-use crate::registry_entry::{build_registry_entry, build_registry_from_block, EmbeddingType};
+use crate::registry_entry::{EmbeddingType, build_registry_entry, build_registry_from_block};
 use crate::withheld::{get_block_serve_denylist_snapshot, get_tx_serve_denylist_snapshot};
 use blvm_protocol::spam_filter::SpamFilterPreset;
 

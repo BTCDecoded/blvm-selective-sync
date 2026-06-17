@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -78,6 +78,8 @@ jobs:
 
       - name: Install Rust (Linux self-hosted)
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.88.0
 
       - name: Regenerate lockfile for crates.io graph
         shell: bash
@@ -89,7 +91,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: test
         run: cargo test --all-targets
@@ -157,6 +159,8 @@ jobs:
       - name: Install Rust (Linux self-hosted)
         if: runner.os == 'Linux'
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.88.0
 
       - name: Install Rust (Windows)
         if: runner.os == 'Windows'

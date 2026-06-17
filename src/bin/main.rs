@@ -7,10 +7,10 @@ use anyhow::Result;
 use blvm_node::module::ipc::protocol::{
     InvocationMessage, InvocationResultMessage, InvocationResultPayload, InvocationType,
 };
-use blvm_sdk::module::runner::{run_module_with_setup_and_api, InvocationContext};
+use blvm_sdk::module::runner::{InvocationContext, run_module_with_setup_and_api};
 use blvm_sdk::module::{ModuleBootstrap, ModuleDb};
 use blvm_selective_sync::module_api::SelectiveSyncModuleAPI;
-use blvm_selective_sync::{ops, SyncPolicyConfig, SyncPolicyModule};
+use blvm_selective_sync::{SyncPolicyConfig, SyncPolicyModule, ops};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::warn;

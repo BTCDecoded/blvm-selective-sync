@@ -19,9 +19,9 @@ pub mod registry_entry;
 pub mod registry_fetch;
 pub mod withheld;
 
-pub use cli::{run_sync_policy, run_sync_policy_capture, SyncPolicyCommand};
+pub use cli::{SyncPolicyCommand, run_sync_policy, run_sync_policy_capture};
 pub use config::SyncPolicyConfig;
 pub use module::SyncPolicyModule;
-pub use registry_entry::{build_registry_entry, infer_embedding_type, EmbeddingType};
+pub use registry_entry::{EmbeddingType, build_registry_entry, infer_embedding_type};
 pub use registry_entry::{RegistryEntry, RegistryIndex};
 pub use withheld::merge_block_serve_denylist;

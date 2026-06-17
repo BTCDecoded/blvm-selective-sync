@@ -4,10 +4,10 @@ use anyhow::Result;
 use blvm_node::module::traits::NodeAPI;
 use blvm_node::storage::database::Database;
 
-use crate::apply_policy::{apply_policy, ApplyReport};
+use crate::apply_policy::{ApplyReport, apply_policy};
 use crate::audit;
 use crate::config::SyncPolicyConfig;
-use crate::policy_store::{refresh_from_fetched, RefreshReport};
+use crate::policy_store::{RefreshReport, refresh_from_fetched};
 use crate::registry_fetch::fetch_registry_index;
 
 #[derive(Debug, Clone)]

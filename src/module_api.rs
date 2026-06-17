@@ -11,7 +11,7 @@ use tracing::debug;
 
 use crate::config::SyncPolicyConfig;
 use crate::ibd_filter::{
-    block_hash_for_event, filter_block, FilterBlockRequest, FilterBlockResponse,
+    FilterBlockRequest, FilterBlockResponse, block_hash_for_event, filter_block,
 };
 
 pub const FILTER_BLOCK_BEFORE_STORE: &str = "filter_block_before_store";
