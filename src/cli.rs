@@ -275,7 +275,14 @@ fn run_status<W: Write>(
     )?;
     writeln!(w, "Policy entries (merged): {}", merged.len())?;
     writeln!(w, "Witness mode: {}", config.witness_mode)?;
-    writeln!(w, "IBD filter enabled: {}", config.ibd_filter_enabled)?;
+    writeln!(w, "Trust registry stubs: {}", config.trust_registry_stubs)?;
+    let dl_stats = crate::download_policy::load_stats(db.as_db().as_ref());
+    writeln!(w)?;
+    writeln!(
+        w,
+        "Download skips (witness): {} blocks, {} verified paths",
+        dl_stats.skip_witness_blocks, dl_stats.verified_paths
+    )?;
     writeln!(
         w,
         "On-chain registry builder: {}",
@@ -332,8 +339,12 @@ fn run_status<W: Write>(
     writeln!(w)?;
     writeln!(
         w,
-        "IBD witness filtering: filter_block_before_store ModuleAPI (enabled={})",
-        config.ibd_filter_enabled
+        "IBD strip: filter_block_before_store (witness_mode={})",
+        if config.witness_mode.is_empty() {
+            "strict"
+        } else {
+            config.witness_mode.as_str()
+        }
     )?;
 
     Ok(())

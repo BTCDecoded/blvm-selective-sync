@@ -10,13 +10,17 @@ pub mod audit;
 pub mod cli;
 pub mod config;
 pub mod db;
+pub mod download_policy;
 pub mod ibd_filter;
+pub mod merkle_proof;
 pub mod module;
 pub mod module_api;
+pub mod op_return_strip;
 pub mod ops;
 pub mod policy_store;
 pub mod registry_entry;
 pub mod registry_fetch;
+pub mod rehydrate;
 pub mod withheld;
 
 pub use cli::{SyncPolicyCommand, run_sync_policy, run_sync_policy_capture};

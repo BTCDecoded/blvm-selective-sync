@@ -7,7 +7,11 @@ Operators maintain a **policy registry** of flagged transactions (witness or OP_
 1. Fetches and quorum-merges remote registries into `ModuleDb` (`registry_entries` tree).
 2. Optionally merges an on-chain-built registry (`on_chain_registry` tree).
 3. Applies **serve policy** to the node (denylist hashes on `getdata`).
-4. Optionally strips **witness data** during IBD persistence via ModuleAPI.
+4. Strips **witness** and/or **OP_RETURN** data during IBD persistence; **stripped payloads are never stored locally**.
+5. When the node needs complete data temporarily, it uses the existing **GetData** path (`NetworkManager::request_block`) — in memory only, not persisted.
+6. Optionally skips witness download when merkle sibling paths verify (`trust_registry_stubs`).
+
+**Trust model:** the registry is quorum policy, not a self-verifying proof. Consensus still comes from validating complete blocks first (download or ephemeral peer fetch). v3 may skip payload download only when a merkle inclusion proof plus operator quorum allow it.
 
 Policy logic stays in this module; the node provides generic integration hooks only.
 
@@ -18,10 +22,10 @@ Policy logic stays in this module; the node provides generic integration hooks o
 | `registries` | `[]` | Registry URLs to subscribe |
 | `min_registry_agreement` | `0.5` | Quorum fraction (0.0–1.0) |
 | `registry_refresh_interval` | `3600` | Seconds between periodic refresh (module-local `tokio::interval`) |
-| `witness_mode` | `""` (strict) | `strict` strips/denies witness embeddings; `relaxed` focuses on OP_RETURN |
-| `ibd_filter_enabled` | `false` | Enable IBD witness stripping |
+| `witness_mode` | `""` (strict) | `strict` strips/denies witness embeddings; `relaxed` strips/denies OP_RETURN only |
+| `trust_registry_stubs` | `false` | v3: skip witness download when merkle paths verify |
 | `on_chain_registry_builder` | `false` | Build local registry from `NewBlock` events |
-| `audit_log` | `false` | Append apply/refresh lines to audit log |
+| `audit_log` | `false` | Append apply/refresh/strip lines to audit log |
 | `audit_log_path` | optional | Audit log file path |
 
 Overrides: node `[modules.selective-sync]`, env `MODULE_CONFIG_*`.
@@ -35,38 +39,25 @@ Overrides: node `[modules.selective-sync]`, env `MODULE_CONFIG_*`.
 | `unsubscribe <url>` | Remove registry URL |
 | `refresh` | HTTP fetch + quorum merge + auto-apply |
 | `apply` | Push merged policy to node serve denylists |
-| `status` | Policy counts, denylist snapshots, IBD filter state |
+| `status` | Policy counts, denylist snapshots, download-skip stats |
 | `export-registry` | Export merged entries JSON |
-| `build-entry` / `build-registry` | Operator tooling from tx/block hex |
+| `build-entry` / `build-registry` | Operator tooling from tx/block hex (`build-registry` fills `merkle_sibling_path`) |
 
-## ModuleAPI: `filter_block_before_store`
+## ModuleAPI
 
 Registered via `run_module_with_setup_and_api` (`register_module_api` capability).
 
-**Request** (bincode):
+| Method | Role |
+|--------|------|
+| `filter_block_before_store` | Strip witness / OP_RETURN before node persist |
+| `rehydrate_block_for_consensus` | Always `found=false` (payloads not kept) |
+| `get_canonical_txids` | Always `found=false` (node GetData if needed) |
+| `lookup_block_for_txids` | Resolve policy txid → block via registry + local header |
+| `filter_block_download_policy` | `skip_witness` when stubs + merkle paths verify |
 
-```text
-{ height, block, witnesses }
-```
+Short method names are unique across modules (first registrant wins).
 
-**Response**:
-
-```text
-{ block, witnesses, stripped_txids, filtered }
-```
-
-When `ibd_filter_enabled` is false, returns input unchanged. On strip, publishes `IBDBlockFiltered` (`publish_events`).
-
-**Node integration:** `blvm-node` `module/pipeline.rs` calls this method from `ParallelIBD::do_flush_to_storage` before witness blobs are written. Fail-open on IPC timeout; `witness_mode: strict` may fail-closed inside the module.
-
-## Serve policy
-
-`apply_policy` resolves flagged txids and block hashes (via `get_block_by_height`) and calls:
-
-- `merge_tx_serve_denylist`
-- `merge_block_serve_denylist`
-
-Requires `network_access`. `status` reads snapshots via `read_network`.
+**Node:** fail-open on IPC timeout/error. **No stripped payload retention on disk.**
 
 ## Storage trees
 
@@ -74,6 +65,7 @@ Requires `network_access`. `status` reads snapshots via `read_network`.
 |------|---------|
 | `registry_entries` | Quorum-merged remote policy (`StoredPolicyEntry`) |
 | `on_chain_registry` | Locally indexed entries from blocks |
+| `download_policy_stats` | v3 skip-witness counters |
 
 ## Periodic refresh
 

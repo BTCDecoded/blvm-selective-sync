@@ -21,7 +21,7 @@ fn default_registry_refresh_interval() -> u64 {
 /// Node config `[modules.selective-sync]` overrides when present.
 /// Env override: `MODULE_CONFIG_REGISTRIES`, `MODULE_CONFIG_LAST_REFRESH`.
 #[config(name = "selective-sync")]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncPolicyConfig {
     #[serde(default)]
     #[config_env]
@@ -47,9 +47,9 @@ pub struct SyncPolicyConfig {
     /// When true, subscribe to NewBlock and build local registry from each block.
     #[serde(default)]
     pub on_chain_registry_builder: bool,
-    /// When true, strip flagged witness data during IBD block persistence.
+    /// v3: skip witness download when merkle sibling paths verify (default off).
     #[serde(default)]
-    pub ibd_filter_enabled: bool,
+    pub trust_registry_stubs: bool,
 }
 
 impl SyncPolicyConfig {
@@ -90,5 +90,21 @@ impl SyncPolicyConfig {
     /// Remove registry URL.
     pub fn unsubscribe(&mut self, url: &str) {
         self.registries.retain(|r| r != url.trim());
+    }
+}
+
+impl Default for SyncPolicyConfig {
+    fn default() -> Self {
+        Self {
+            registries: vec![],
+            last_refresh: None,
+            min_registry_agreement: default_min_registry_agreement(),
+            registry_refresh_interval: default_registry_refresh_interval(),
+            witness_mode: String::new(),
+            audit_log: false,
+            audit_log_path: None,
+            on_chain_registry_builder: false,
+            trust_registry_stubs: false,
+        }
     }
 }

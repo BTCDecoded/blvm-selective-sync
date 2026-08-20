@@ -49,7 +49,7 @@ pub struct InputStub {
 
 /// Infer embedding type from transaction using SpamFilter (for build-entry --auto).
 ///
-/// Maps: Ordinals/LargeWitness → Witness; BRC20/OP_RETURN>80 bytes → OpReturn.
+/// Maps: UnexecIf/DataLikeMs/LargeWitness → Witness; NullData*/OP_RETURN>80 → OpReturn.
 /// Defaults to Witness when inference is ambiguous.
 pub fn infer_embedding_type(tx_hex: &str) -> Result<EmbeddingType> {
     let tx_bytes = hex::decode(tx_hex.trim().trim_start_matches("0x"))
@@ -62,19 +62,18 @@ pub fn infer_embedding_type(tx_hex: &str) -> Result<EmbeddingType> {
     let witnesses_slice = witnesses.as_slice();
     let result = filter.is_spam_with_witness(&tx, Some(witnesses_slice), None);
 
-    // Witness-based: Ordinals, LargeWitness
     for t in &result.detected_types {
-        if matches!(t, SpamType::Ordinals | SpamType::LargeWitness) {
+        if matches!(
+            t,
+            SpamType::UnexecIf | SpamType::DataLikeMs | SpamType::LargeWitness
+        ) {
             return Ok(EmbeddingType::Witness);
         }
     }
 
-    // OP_RETURN-based: BRC20 or explicit OP_RETURN > 80 bytes
-    if result
-        .detected_types
-        .iter()
-        .any(|t| matches!(t, SpamType::BRC20))
-    {
+    if result.detected_types.iter().any(|t| {
+        matches!(t, SpamType::NullDataOp13 | SpamType::NullDataMagic)
+    }) {
         return Ok(EmbeddingType::OpReturn);
     }
     if has_large_op_return(&tx) {
@@ -230,6 +229,7 @@ pub fn build_registry_from_block(
         deserialize_block_with_witnesses(&block_bytes).context("Failed to parse block")?;
 
     let filter = SpamFilter::with_preset(preset);
+    let txids: Vec<[u8; 32]> = block.transactions.iter().map(calculate_tx_id).collect();
     let mut entries = Vec::new();
 
     for (tx_index, tx) in block.transactions.iter().enumerate() {
@@ -245,17 +245,16 @@ pub fn build_registry_from_block(
             continue;
         }
 
-        let embedding = if result
-            .detected_types
-            .iter()
-            .any(|t| matches!(t, SpamType::Ordinals | SpamType::LargeWitness))
-        {
+        let embedding = if result.detected_types.iter().any(|t| {
+            matches!(
+                t,
+                SpamType::UnexecIf | SpamType::DataLikeMs | SpamType::LargeWitness
+            )
+        }) {
             EmbeddingType::Witness
-        } else if result
-            .detected_types
-            .iter()
-            .any(|t| matches!(t, SpamType::BRC20))
-            || has_large_op_return(tx)
+        } else if result.detected_types.iter().any(|t| {
+            matches!(t, SpamType::NullDataOp13 | SpamType::NullDataMagic)
+        }) || has_large_op_return(tx)
         {
             EmbeddingType::OpReturn
         } else {
@@ -285,12 +284,14 @@ pub fn build_registry_from_block(
             })
             .collect();
 
+        let merkle_sibling_path = crate::merkle_proof::sibling_path(&txids, tx_index).ok();
+
         entries.push(RegistryEntry {
             txid: txid_hex,
             block_height,
             block_position: Some(tx_index as u32),
             embedding_type: embedding,
-            merkle_sibling_path: None,
+            merkle_sibling_path,
             outputs,
             inputs,
         });

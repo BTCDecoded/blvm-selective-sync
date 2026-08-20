@@ -1,4 +1,4 @@
-//! IBD witness stripping for flagged transactions.
+//! IBD witness + OP_RETURN stripping for flagged transactions.
 
 use anyhow::Result;
 use blvm_node::storage::database::Database;
@@ -9,6 +9,7 @@ use std::collections::HashSet;
 
 use crate::apply_policy::block_hash_from_header;
 use crate::config::SyncPolicyConfig;
+use crate::op_return_strip::stub_op_return_outputs;
 use crate::policy_store::load_merged_entries;
 use crate::registry_entry::{EmbeddingType, RegistryEntry};
 
@@ -27,39 +28,48 @@ pub struct FilterBlockResponse {
     pub filtered: bool,
 }
 
-pub fn should_strip_entry(config: &SyncPolicyConfig, entry: &RegistryEntry) -> bool {
-    match config.witness_mode.as_str() {
-        "relaxed" => matches!(entry.embedding_type, EmbeddingType::OpReturn),
-        _ => matches!(entry.embedding_type, EmbeddingType::Witness),
+pub fn should_strip_witness(config: &SyncPolicyConfig, entry: &RegistryEntry) -> bool {
+    if config.witness_mode == "relaxed" {
+        return false;
     }
+    matches!(entry.embedding_type, EmbeddingType::Witness)
 }
 
-/// Strip witness stacks for flagged transactions in a block.
+pub fn should_strip_op_return(_config: &SyncPolicyConfig, entry: &RegistryEntry) -> bool {
+    matches!(entry.embedding_type, EmbeddingType::OpReturn)
+}
+
+pub fn should_strip_entry(config: &SyncPolicyConfig, entry: &RegistryEntry) -> bool {
+    should_strip_witness(config, entry) || should_strip_op_return(config, entry)
+}
+
+/// Strip witness stacks and/or OP_RETURN bodies for flagged transactions.
 pub fn filter_block(
     db: &dyn Database,
     config: &SyncPolicyConfig,
-    height: u64,
-    block: Block,
+    _height: u64,
+    mut block: Block,
     mut witnesses: Vec<Vec<Witness>>,
 ) -> Result<FilterBlockResponse> {
-    let _ = height;
-    let entries = load_merged_entries(db)?;
-    if entries.is_empty() {
-        return Ok(FilterBlockResponse {
-            block,
-            witnesses,
-            stripped_txids: vec![],
-            filtered: false,
-        });
-    }
-
-    let strip_txids: HashSet<String> = entries
+    let canonical_txids: Vec<String> = block
+        .transactions
         .iter()
-        .filter(|stored| should_strip_entry(config, &stored.entry))
+        .map(|tx| hex::encode(calculate_tx_id(tx)).to_ascii_lowercase())
+        .collect();
+
+    let entries = load_merged_entries(db)?;
+    let witness_txids: HashSet<String> = entries
+        .iter()
+        .filter(|stored| should_strip_witness(config, &stored.entry))
+        .map(|stored| stored.entry.txid.to_ascii_lowercase())
+        .collect();
+    let op_return_txids: HashSet<String> = entries
+        .iter()
+        .filter(|stored| should_strip_op_return(config, &stored.entry))
         .map(|stored| stored.entry.txid.to_ascii_lowercase())
         .collect();
 
-    if strip_txids.is_empty() {
+    if witness_txids.is_empty() && op_return_txids.is_empty() {
         return Ok(FilterBlockResponse {
             block,
             witnesses,
@@ -69,23 +79,35 @@ pub fn filter_block(
     }
 
     let mut stripped_txids = Vec::new();
-    for (i, tx) in block.transactions.iter().enumerate() {
-        let txid = hex::encode(calculate_tx_id(tx));
-        if !strip_txids.contains(&txid) {
-            continue;
-        }
-        if i < witnesses.len() {
-            witnesses[i] = tx.inputs.iter().map(|_| Vec::new()).collect();
-        }
-        stripped_txids.push(txid);
-    }
 
-    let filtered = !stripped_txids.is_empty();
+    let mut txs: Vec<_> = block.transactions.to_vec();
+    for (i, tx) in txs.iter_mut().enumerate() {
+        let txid = &canonical_txids[i];
+        let mut flagged = false;
+
+        if witness_txids.contains(txid) && i < witnesses.len() {
+            witnesses[i] = tx.inputs.iter().map(|_| Vec::new()).collect();
+            flagged = true;
+        }
+
+        if op_return_txids.contains(txid) {
+            let stubbed = stub_op_return_outputs(tx);
+            if stubbed > 0 {
+                flagged = true;
+            }
+        }
+
+        if flagged {
+            stripped_txids.push(txid.clone());
+        }
+    }
+    block.transactions = txs.into();
+
     Ok(FilterBlockResponse {
         block,
         witnesses,
-        stripped_txids,
-        filtered,
+        stripped_txids: stripped_txids.clone(),
+        filtered: !stripped_txids.is_empty(),
     })
 }
 
@@ -98,6 +120,7 @@ mod tests {
     use super::*;
     use crate::policy_store::refresh_from_fetched;
     use crate::registry_entry::{RegistryEntry, RegistryIndex};
+    use blvm_protocol::mining::calculate_merkle_root_from_tx_ids;
     use blvm_protocol::{
         Block, BlockHeader, OutPoint, Transaction, TransactionInput, TransactionOutput,
     };
@@ -109,6 +132,18 @@ mod tests {
             block_height: Some(1),
             block_position: Some(1),
             embedding_type: EmbeddingType::Witness,
+            merkle_sibling_path: None,
+            outputs: vec![],
+            inputs: vec![],
+        }
+    }
+
+    fn opreturn_entry(txid: &str) -> RegistryEntry {
+        RegistryEntry {
+            txid: txid.to_string(),
+            block_height: Some(1),
+            block_position: Some(1),
+            embedding_type: EmbeddingType::OpReturn,
             merkle_sibling_path: None,
             outputs: vec![],
             inputs: vec![],
@@ -145,10 +180,16 @@ mod tests {
                 sequence: 0xffffffff,
             }]
             .into(),
-            outputs: vec![TransactionOutput {
-                value: 1_000,
-                script_pubkey: vec![0x51],
-            }]
+            outputs: vec![
+                TransactionOutput {
+                    value: 0,
+                    script_pubkey: vec![0x6a, 0x04, b't', b'e', b's', b't'],
+                },
+                TransactionOutput {
+                    value: 1_000,
+                    script_pubkey: vec![0x51],
+                },
+            ]
             .into(),
             lock_time: 0,
         };
@@ -167,27 +208,26 @@ mod tests {
         (block, witnesses)
     }
 
+    fn store_index(db: &dyn Database, config: &SyncPolicyConfig, entries: Vec<RegistryEntry>) {
+        let index = RegistryIndex { entries };
+        refresh_from_fetched(db, config, &[("test".into(), index)], "now").unwrap();
+    }
+
     #[test]
     fn strips_flagged_witness_stack() {
         let (block, witnesses) = sample_block_with_witnesses();
         let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
-
         let dir = tempfile::tempdir().unwrap();
         let db = ModuleDb::open(dir.path()).unwrap();
         let config = SyncPolicyConfig {
             witness_mode: "strict".to_string(),
             ..Default::default()
         };
-        let index = RegistryIndex {
-            entries: vec![witness_entry(&flagged_txid)],
-        };
-        refresh_from_fetched(
+        store_index(
             db.as_db().as_ref(),
             &config,
-            &[("test".into(), index)],
-            "now",
-        )
-        .unwrap();
+            vec![witness_entry(&flagged_txid)],
+        );
 
         let response = filter_block(db.as_db().as_ref(), &config, 1, block, witnesses).unwrap();
         assert!(response.filtered);
@@ -226,27 +266,108 @@ mod tests {
     fn relaxed_mode_skips_witness_entries() {
         let (block, witnesses) = sample_block_with_witnesses();
         let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
-
         let dir = tempfile::tempdir().unwrap();
         let db = ModuleDb::open(dir.path()).unwrap();
         let config = SyncPolicyConfig {
             witness_mode: "relaxed".to_string(),
             ..Default::default()
         };
-        let index = RegistryIndex {
-            entries: vec![witness_entry(&flagged_txid)],
-        };
-        refresh_from_fetched(
+        store_index(
             db.as_db().as_ref(),
             &config,
-            &[("test".into(), index)],
-            "now",
-        )
-        .unwrap();
+            vec![witness_entry(&flagged_txid)],
+        );
 
         let response =
             filter_block(db.as_db().as_ref(), &config, 1, block, witnesses.clone()).unwrap();
         assert!(!response.filtered);
         assert_eq!(response.witnesses, witnesses);
+    }
+
+    #[test]
+    fn op_return_strip_independent_of_witness_mode() {
+        let (block, witnesses) = sample_block_with_witnesses();
+        let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
+        let dir = tempfile::tempdir().unwrap();
+        let db = ModuleDb::open(dir.path()).unwrap();
+        let config = SyncPolicyConfig {
+            witness_mode: "strict".to_string(),
+            ..Default::default()
+        };
+        store_index(
+            db.as_db().as_ref(),
+            &config,
+            vec![opreturn_entry(&flagged_txid)],
+        );
+
+        let response =
+            filter_block(db.as_db().as_ref(), &config, 1, block, witnesses.clone()).unwrap();
+        assert!(response.filtered);
+        assert_eq!(
+            response.block.transactions[1].outputs[0].script_pubkey,
+            vec![0x6a]
+        );
+        assert_eq!(response.witnesses, witnesses);
+    }
+
+    #[test]
+    fn relaxed_mode_strips_op_return_but_not_witness() {
+        let (block, witnesses) = sample_block_with_witnesses();
+        let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
+        let dir = tempfile::tempdir().unwrap();
+        let db = ModuleDb::open(dir.path()).unwrap();
+        let config = SyncPolicyConfig {
+            witness_mode: "relaxed".to_string(),
+            ..Default::default()
+        };
+        store_index(
+            db.as_db().as_ref(),
+            &config,
+            vec![opreturn_entry(&flagged_txid)],
+        );
+
+        let response =
+            filter_block(db.as_db().as_ref(), &config, 1, block, witnesses.clone()).unwrap();
+        assert!(response.filtered);
+        assert_eq!(
+            response.block.transactions[1].outputs[0].script_pubkey,
+            vec![0x6a]
+        );
+        assert_eq!(response.witnesses, witnesses);
+
+        store_index(
+            db.as_db().as_ref(),
+            &config,
+            vec![witness_entry(&flagged_txid)],
+        );
+        let (block2, witnesses2) = sample_block_with_witnesses();
+        let response2 =
+            filter_block(db.as_db().as_ref(), &config, 1, block2, witnesses2.clone()).unwrap();
+        assert!(!response2.filtered);
+        assert_eq!(response2.witnesses, witnesses2);
+    }
+
+    #[test]
+    fn stripped_block_merkle_uses_pre_strip_txids_in_memory() {
+        let (block, witnesses) = sample_block_with_witnesses();
+        let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
+        let canonical: Vec<[u8; 32]> = block.transactions.iter().map(calculate_tx_id).collect();
+        let root = calculate_merkle_root_from_tx_ids(&canonical).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = ModuleDb::open(dir.path()).unwrap();
+        let config = SyncPolicyConfig {
+            witness_mode: "strict".to_string(),
+            ..Default::default()
+        };
+        store_index(
+            db.as_db().as_ref(),
+            &config,
+            vec![witness_entry(&flagged_txid)],
+        );
+
+        let response = filter_block(db.as_db().as_ref(), &config, 1, block, witnesses).unwrap();
+        assert!(response.witnesses[1].iter().all(|stack| stack.is_empty()));
+        assert_eq!(calculate_merkle_root_from_tx_ids(&canonical).unwrap(), root);
     }
 }

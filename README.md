@@ -8,7 +8,8 @@ Part of [Bitcoin Commons](https://btcdecoded.org) BLVM. Loaded by the node as a 
 
 - **Registry policy** — Subscribe to remote registry URLs; quorum-merge entries into module-local storage.
 - **P2P serve policy** — `apply` pushes merged tx/block hashes to node serve denylists (`merge_*_serve_denylist`).
-- **IBD witness filter** — When `ibd_filter_enabled = true`, strips flagged witness stacks before the node persists blocks during IBD (`filter_block_before_store` ModuleAPI).
+- **IBD witness / OP_RETURN filter** — Registry-flagged txs are stripped at persistence; payloads are **never stored**. When the node needs full data, it GetData's from peers (existing download path) and does not persist the result.
+- **v3 download policy** — Optional `trust_registry_stubs` skips witness getdata when merkle sibling paths verify.
 - **On-chain indexer** — Optional `on_chain_registry_builder` builds a local registry from `NewBlock` events.
 - **CLI** — `blvm sync-policy …` subcommands (list, subscribe, refresh, apply, status, export-registry, build-entry, build-registry).
 
@@ -24,11 +25,11 @@ blvm sync-policy apply      # re-apply denylists without fetch
 blvm sync-policy status
 ```
 
-3. Enable IBD filtering in module `config.toml` (path from `blvm sync-policy config-path`):
+3. Subscribe to registries and refresh (no separate strip enable flags — policy applies per merged entry):
 
 ```toml
-ibd_filter_enabled = true
-witness_mode = "strict"   # or "relaxed"
+witness_mode = "strict"
+# trust_registry_stubs = false  # optional witness download skip
 ```
 
 Node `[modules.selective-sync]` can override these keys via the SDK `#[config]` macro.

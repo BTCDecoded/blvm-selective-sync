@@ -231,7 +231,7 @@ impl SyncPolicyModule {
         event: &blvm_node::module::ipc::protocol::EventMessage,
         ctx: &InvocationContext,
     ) -> Result<(), ModuleError> {
-        let (_block_hash, height) = match &event.payload {
+        let (block_hash, height) = match &event.payload {
             blvm_node::module::ipc::protocol::EventPayload::NewBlock {
                 block_hash, height, ..
             } => (block_hash, *height),
@@ -245,15 +245,20 @@ impl SyncPolicyModule {
             Some(api) => api,
             None => return Ok(()),
         };
-        let block = match node_api.get_block_by_height(height).await {
-            Ok(Some(b)) => b,
-            _ => return Ok(()),
+        let (block, witnesses) = match node_api.get_block_and_witnesses(block_hash).await {
+            Ok(Some(pair)) => pair,
+            _ => match node_api.get_block_by_height(height).await {
+                Ok(Some(b)) => {
+                    let empty: Vec<Vec<blvm_protocol::segwit::Witness>> =
+                        b.transactions.iter().map(|_| Vec::new()).collect();
+                    (b, empty)
+                }
+                _ => return Ok(()),
+            },
         };
-        let empty_witnesses: Vec<Vec<blvm_protocol::segwit::Witness>> =
-            block.transactions.iter().map(|_| Vec::new()).collect();
         let block_bytes = blvm_protocol::serialization::block::serialize_block_with_witnesses(
             &block,
-            &empty_witnesses,
+            &witnesses,
             false,
         );
         let block_hex = hex::encode(block_bytes);
