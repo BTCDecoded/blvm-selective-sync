@@ -257,9 +257,7 @@ impl SyncPolicyModule {
             },
         };
         let block_bytes = blvm_protocol::serialization::block::serialize_block_with_witnesses(
-            &block,
-            &witnesses,
-            false,
+            &block, &witnesses, false,
         );
         let block_hex = hex::encode(block_bytes);
         let preset = SpamFilterPreset::Moderate;

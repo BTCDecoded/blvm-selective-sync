@@ -71,9 +71,11 @@ pub fn infer_embedding_type(tx_hex: &str) -> Result<EmbeddingType> {
         }
     }
 
-    if result.detected_types.iter().any(|t| {
-        matches!(t, SpamType::NullDataOp13 | SpamType::NullDataMagic)
-    }) {
+    if result
+        .detected_types
+        .iter()
+        .any(|t| matches!(t, SpamType::NullDataOp13 | SpamType::NullDataMagic))
+    {
         return Ok(EmbeddingType::OpReturn);
     }
     if has_large_op_return(&tx) {
@@ -252,9 +254,11 @@ pub fn build_registry_from_block(
             )
         }) {
             EmbeddingType::Witness
-        } else if result.detected_types.iter().any(|t| {
-            matches!(t, SpamType::NullDataOp13 | SpamType::NullDataMagic)
-        }) || has_large_op_return(tx)
+        } else if result
+            .detected_types
+            .iter()
+            .any(|t| matches!(t, SpamType::NullDataOp13 | SpamType::NullDataMagic))
+            || has_large_op_return(tx)
         {
             EmbeddingType::OpReturn
         } else {
