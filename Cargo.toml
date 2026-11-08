@@ -1,6 +1,6 @@
 [package]
 name = "blvm-selective-sync"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 authors = ["Bitcoin Commons Team"]
 description = "Selective sync: download policy for flagged transaction content during IBD"
