@@ -104,6 +104,7 @@ async fn main() -> Result<()> {
                 None,
                 Some("ModuleApi dispatch should be handled by runner".to_string()),
             ),
+            _ => (false, None, Some("unsupported invocation".to_string())),
         };
         InvocationResultMessage {
             correlation_id: invocation.correlation_id,
