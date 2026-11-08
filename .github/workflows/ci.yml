@@ -366,7 +366,9 @@ jobs:
 
       - name: Dry-run publish
         if: steps.gate.outputs.do_release == 'true'
-        run: cargo publish --dry-run --allow-dirty
+        run: |
+          rm -f Cargo.lock
+          cargo publish --dry-run --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
