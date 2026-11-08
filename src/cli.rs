@@ -246,13 +246,16 @@ fn publish_selective_sync_policy_applied(
     registry_count: usize,
 ) {
     if let Some(node_api) = ctx.node_api() {
-        let payload = blvm_node::module::ipc::protocol::EventPayload::SelectiveSyncPolicyApplied {
-            policy_source: policy_source.to_string(),
-            registry_count,
-        };
+        let payload = blvm_node::module::ipc::protocol::EventPayload::module_event_json(
+            "SelectiveSyncPolicyApplied",
+            &serde_json::json!({
+                "policy_source": policy_source,
+                "registry_count": registry_count,
+            }),
+        );
         let _ = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current()
-                .block_on(node_api.publish_event(EventType::SelectiveSyncPolicyApplied, payload))
+                .block_on(node_api.publish_event(EventType::ModuleEvent, payload))
         });
     }
 }

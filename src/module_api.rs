@@ -124,14 +124,17 @@ impl SelectiveSyncModuleAPI {
 
         if response.filtered {
             let block_hash = block_hash_for_event(&response.block);
-            let payload = EventPayload::IBDBlockFiltered {
-                block_hash,
-                height: req.height,
-                reason: "selective_sync".to_string(),
-            };
+            let payload = EventPayload::module_event_json(
+                "IBDBlockFiltered",
+                &serde_json::json!({
+                    "block_hash": hex::encode(block_hash),
+                    "height": req.height,
+                    "reason": "selective_sync",
+                }),
+            );
             if let Err(e) = self
                 .node_api
-                .publish_event(EventType::IBDBlockFiltered, payload)
+                .publish_event(EventType::ModuleEvent, payload)
                 .await
             {
                 tracing::warn!("Failed to publish IBDBlockFiltered: {e}");
