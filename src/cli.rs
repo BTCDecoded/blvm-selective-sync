@@ -373,8 +373,8 @@ pub fn resolve_tx_hex(
                 node_api
                     .get_transaction(&hash)
                     .await
-                    .map_err(|e| anyhow::anyhow!("Failed to fetch transaction from node: {}", e))?
-                    .ok_or_else(|| anyhow::anyhow!("Transaction {} not found in node", s))
+                    .map_err(|e| anyhow::anyhow!("Failed to fetch transaction from node: {e}"))?
+                    .ok_or_else(|| anyhow::anyhow!("Transaction {s} not found in node"))
             })?;
             let serialized = serialize_transaction(&tx);
             return Ok(hex::encode(serialized));
