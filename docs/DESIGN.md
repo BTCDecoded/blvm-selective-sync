@@ -11,7 +11,7 @@ Operators maintain a **policy registry** of flagged transactions (witness or OP_
 5. When the node needs complete data temporarily, it uses the existing **GetData** path (`NetworkManager::request_block`) — in memory only, not persisted.
 6. Optionally skips witness download when merkle sibling paths verify (`trust_registry_stubs`).
 
-**Trust model:** the registry is quorum policy, not a self-verifying proof. Consensus still comes from validating complete blocks first (download or ephemeral peer fetch). v3 may skip payload download only when a merkle inclusion proof plus operator quorum allow it.
+**Trust model:** the registry is quorum policy, not a self-verifying proof. The stored block is stripped. `rehydrate_block_for_consensus` always returns not found. An IPC timeout does not apply the denylist. The stripped copy is not the block consensus validated.
 
 Policy logic stays in this module; the node provides generic integration hooks only.
 
