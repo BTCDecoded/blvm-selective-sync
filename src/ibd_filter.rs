@@ -1,4 +1,7 @@
-//! IBD witness + OP_RETURN stripping for flagged transactions.
+//! IBD witness stripping for flagged transactions.
+//!
+//! An OP_RETURN script is committed by the txid and the header merkle root.
+//! Rewriting it used to store a body that no longer matches the header.
 
 use anyhow::Result;
 use blvm_node::storage::database::Database;
@@ -9,7 +12,6 @@ use std::collections::HashSet;
 
 use crate::apply_policy::block_hash_from_header;
 use crate::config::SyncPolicyConfig;
-use crate::op_return_strip::stub_op_return_outputs;
 use crate::policy_store::load_merged_entries;
 use crate::registry_entry::{EmbeddingType, RegistryEntry};
 
@@ -43,12 +45,12 @@ pub fn should_strip_entry(config: &SyncPolicyConfig, entry: &RegistryEntry) -> b
     should_strip_witness(config, entry) || should_strip_op_return(config, entry)
 }
 
-/// Strip witness stacks and/or OP_RETURN bodies for flagged transactions.
+/// Drop witness stacks for flagged transactions. Transaction bytes stay.
 pub fn filter_block(
     db: &dyn Database,
     config: &SyncPolicyConfig,
     _height: u64,
-    mut block: Block,
+    block: Block,
     mut witnesses: Vec<Vec<Witness>>,
 ) -> Result<FilterBlockResponse> {
     let canonical_txids: Vec<String> = block
@@ -63,13 +65,8 @@ pub fn filter_block(
         .filter(|stored| should_strip_witness(config, &stored.entry))
         .map(|stored| stored.entry.txid.to_ascii_lowercase())
         .collect();
-    let op_return_txids: HashSet<String> = entries
-        .iter()
-        .filter(|stored| should_strip_op_return(config, &stored.entry))
-        .map(|stored| stored.entry.txid.to_ascii_lowercase())
-        .collect();
 
-    if witness_txids.is_empty() && op_return_txids.is_empty() {
+    if witness_txids.is_empty() {
         return Ok(FilterBlockResponse {
             block,
             witnesses,
@@ -80,28 +77,13 @@ pub fn filter_block(
 
     let mut stripped_txids = Vec::new();
 
-    let mut txs: Vec<_> = block.transactions.to_vec();
-    for (i, tx) in txs.iter_mut().enumerate() {
+    for (i, tx) in block.transactions.iter().enumerate() {
         let txid = &canonical_txids[i];
-        let mut flagged = false;
-
         if witness_txids.contains(txid) && i < witnesses.len() {
             witnesses[i] = tx.inputs.iter().map(|_| Vec::new()).collect();
-            flagged = true;
-        }
-
-        if op_return_txids.contains(txid) {
-            let stubbed = stub_op_return_outputs(tx);
-            if stubbed > 0 {
-                flagged = true;
-            }
-        }
-
-        if flagged {
             stripped_txids.push(txid.clone());
         }
     }
-    block.transactions = txs.into();
 
     Ok(FilterBlockResponse {
         block,
@@ -285,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn op_return_strip_independent_of_witness_mode() {
+    fn op_return_script_stays_because_the_txid_commits_to_it() {
         let (block, witnesses) = sample_block_with_witnesses();
         let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
         let dir = tempfile::tempdir().unwrap();
@@ -300,18 +282,24 @@ mod tests {
             vec![opreturn_entry(&flagged_txid)],
         );
 
+        let original_script = block.transactions[1].outputs[0].script_pubkey.clone();
+        let original_txid = flagged_txid.clone();
         let response =
             filter_block(db.as_db().as_ref(), &config, 1, block, witnesses.clone()).unwrap();
-        assert!(response.filtered);
+        assert!(!response.filtered);
         assert_eq!(
             response.block.transactions[1].outputs[0].script_pubkey,
-            vec![0x6a]
+            original_script
+        );
+        assert_eq!(
+            hex::encode(calculate_tx_id(&response.block.transactions[1])),
+            original_txid
         );
         assert_eq!(response.witnesses, witnesses);
     }
 
     #[test]
-    fn relaxed_mode_strips_op_return_but_not_witness() {
+    fn relaxed_mode_keeps_op_return_and_witness() {
         let (block, witnesses) = sample_block_with_witnesses();
         let flagged_txid = hex::encode(calculate_tx_id(&block.transactions[1]));
         let dir = tempfile::tempdir().unwrap();
@@ -326,12 +314,13 @@ mod tests {
             vec![opreturn_entry(&flagged_txid)],
         );
 
+        let original_script = block.transactions[1].outputs[0].script_pubkey.clone();
         let response =
             filter_block(db.as_db().as_ref(), &config, 1, block, witnesses.clone()).unwrap();
-        assert!(response.filtered);
+        assert!(!response.filtered);
         assert_eq!(
             response.block.transactions[1].outputs[0].script_pubkey,
-            vec![0x6a]
+            original_script
         );
         assert_eq!(response.witnesses, witnesses);
 
