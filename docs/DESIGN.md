@@ -7,11 +7,11 @@ Operators maintain a **policy registry** of flagged transactions (witness or OP_
 1. Fetches and quorum-merges remote registries into `ModuleDb` (`registry_entries` tree).
 2. Optionally merges an on-chain-built registry (`on_chain_registry` tree).
 3. Applies **serve policy** to the node (denylist hashes on `getdata`).
-4. Strips **witness** and/or **OP_RETURN** data during IBD persistence; **stripped payloads are never stored locally**.
+4. Strips **witness stacks** for flagged transactions during IBD persistence. Transaction bytes, including `OP_RETURN` payloads, stay, so the header merkle root still matches. Stripped witness stacks are never stored.
 5. When the node needs complete data temporarily, it uses the existing **GetData** path (`NetworkManager::request_block`) — in memory only, not persisted.
 6. Optionally skips witness download when merkle sibling paths verify (`trust_registry_stubs`).
 
-**Trust model:** the registry is quorum policy, not a self-verifying proof. The stored block is stripped. `rehydrate_block_for_consensus` always returns not found. An IPC timeout does not apply the denylist. The stripped copy is not the block consensus validated.
+**Trust model:** the registry is quorum policy, not a self-verifying proof. The stored witness may be stripped. `rehydrate_block_for_consensus` always returns not found. The node fetches the block from a peer when it needs the original stacks. If that fetch fails and the stored stacks do not match the coinbase witness commitment, a reorg stops with `witness not retained` and the tip stays. `getdata` for a witness block answers `notfound` in that same case. An IPC timeout does not apply the denylist. The stripped copy is not the block consensus validated.
 
 Policy logic stays in this module; the node provides generic integration hooks only.
 
@@ -49,7 +49,7 @@ Registered via `run_module_with_setup_and_api` (`register_module_api` capability
 
 | Method | Role |
 |--------|------|
-| `filter_block_before_store` | Strip witness / OP_RETURN before node persist |
+| `filter_block_before_store` | Clear witness stacks for flagged transactions before node persist. `OP_RETURN` bytes are not rewritten. |
 | `rehydrate_block_for_consensus` | Always `found=false` (payloads not kept) |
 | `get_canonical_txids` | Always `found=false` (node GetData if needed) |
 | `lookup_block_for_txids` | Resolve policy txid → block via registry + local header |
