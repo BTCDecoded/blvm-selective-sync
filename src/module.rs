@@ -237,7 +237,8 @@ impl SyncPolicyModule {
             } => (block_hash, *height),
             _ => return Ok(()),
         };
-        let config = SyncPolicyConfig::load(SyncPolicyConfig::config_path()).unwrap_or_default();
+        let config = SyncPolicyConfig::load(SyncPolicyConfig::config_path())
+            .map_err(|error| ModuleError::Other(error.to_string()))?;
         if !config.on_chain_registry_builder {
             return Ok(());
         }

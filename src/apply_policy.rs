@@ -31,14 +31,13 @@ pub async fn apply_policy(
         if let Ok(hash) = txid_to_hash(&stored.entry.txid) {
             tx_hashes.push(hash);
         }
-        if should_deny_block(config, &stored.entry) {
-            if let Some(height) = stored.entry.block_height {
-                if let Ok(Some(block)) = node_api.get_block_by_height(height).await {
-                    let hash = block_hash_from_header(&block.header);
-                    if !block_hashes.contains(&hash) {
-                        block_hashes.push(hash);
-                    }
-                }
+        if should_deny_block(config, &stored.entry)
+            && let Some(height) = stored.entry.block_height
+            && let Ok(Some(block)) = node_api.get_block_by_height(height).await
+        {
+            let hash = block_hash_from_header(&block.header);
+            if !block_hashes.contains(&hash) {
+                block_hashes.push(hash);
             }
         }
     }

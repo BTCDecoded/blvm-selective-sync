@@ -42,8 +42,9 @@ impl SelectiveSyncModuleAPI {
         }
     }
 
-    fn load_config(&self) -> SyncPolicyConfig {
-        SyncPolicyConfig::load(self.data_dir.join("config.toml")).unwrap_or_default()
+    fn load_config(&self) -> Result<SyncPolicyConfig, ModuleError> {
+        SyncPolicyConfig::load(self.data_dir.join("config.toml"))
+            .map_err(|error| ModuleError::Other(error.to_string()))
     }
 }
 
@@ -92,7 +93,7 @@ impl SelectiveSyncModuleAPI {
             ModuleError::OperationError(format!("Invalid filter_block_before_store params: {e}"))
         })?;
 
-        let config = self.load_config();
+        let config = self.load_config()?;
         debug!(
             "filter_block_before_store height={} from {}",
             req.height, caller_module_id
@@ -194,7 +195,7 @@ impl SelectiveSyncModuleAPI {
         let req: DownloadPolicyRequest = bincode::deserialize(params).map_err(|e| {
             ModuleError::OperationError(format!("Invalid filter_block_download_policy params: {e}"))
         })?;
-        let config = self.load_config();
+        let config = self.load_config()?;
         let response: DownloadPolicyResponse =
             decide_download_policy(self.db.as_ref(), &config, req.height, &req.merkle_root)
                 .unwrap_or(DownloadPolicyResponse {

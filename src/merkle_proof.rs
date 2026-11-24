@@ -21,7 +21,7 @@ pub fn sibling_path(txids: &[Hash], leaf_index: usize) -> Result<Vec<String>> {
         if level.len() % 2 == 1 {
             level.push(*level.last().expect("non-empty"));
         }
-        let sibling = if idx % 2 == 0 {
+        let sibling = if idx.is_multiple_of(2) {
             level[idx + 1]
         } else {
             level[idx - 1]
@@ -54,7 +54,7 @@ pub fn verify_sibling_path(
         }
         let mut sibling = [0u8; 32];
         sibling.copy_from_slice(&sibling_bytes);
-        hash = if idx % 2 == 0 {
+        hash = if idx.is_multiple_of(2) {
             parent_hash(&hash, &sibling)
         } else {
             parent_hash(&sibling, &hash)

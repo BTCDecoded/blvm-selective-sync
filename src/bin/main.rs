@@ -27,7 +27,9 @@ async fn main() -> Result<()> {
                  data_dir: &std::path::Path| {
         let data_dir = data_dir.to_path_buf();
         async move {
-            let config = SyncPolicyConfig::load(data_dir.join("config.toml")).unwrap_or_default();
+            let config = SyncPolicyConfig::load(data_dir.join("config.toml")).map_err(|error| {
+                blvm_node::module::traits::ModuleError::Other(error.to_string())
+            })?;
             if !config.registries.is_empty() && config.registry_refresh_interval > 0 {
                 let interval_secs = config.registry_refresh_interval;
                 let refresh_data_dir = data_dir.clone();
@@ -38,8 +40,14 @@ async fn main() -> Result<()> {
                         tokio::time::interval(Duration::from_secs(interval_secs.max(60)));
                     loop {
                         interval.tick().await;
-                        let mut cfg = SyncPolicyConfig::load(refresh_data_dir.join("config.toml"))
-                            .unwrap_or_default();
+                        let mut cfg =
+                            match SyncPolicyConfig::load(refresh_data_dir.join("config.toml")) {
+                                Ok(cfg) => cfg,
+                                Err(error) => {
+                                    warn!("selective-sync: skipping registry refresh: {error}");
+                                    continue;
+                                }
+                            };
                         if cfg.registries.is_empty() {
                             continue;
                         }

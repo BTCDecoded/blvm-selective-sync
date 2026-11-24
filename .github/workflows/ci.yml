@@ -93,7 +93,7 @@ jobs:
       - name: Install Rust (Linux self-hosted)
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
         with:
-          toolchain: 1.88.0
+          toolchain: 1.91.0
           components: rustfmt clippy
 
       - name: Regenerate lockfile for crates.io graph
@@ -181,7 +181,7 @@ jobs:
         if: runner.os == 'Linux'
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
         with:
-          toolchain: 1.88.0
+          toolchain: 1.91.0
 
       - name: Install Rust (Windows)
         if: runner.os == 'Windows'
@@ -283,7 +283,7 @@ jobs:
         if: steps.gate.outputs.do_release == 'true'
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
         with:
-          toolchain: 1.88.0
+          toolchain: 1.91.0
 
       - name: Determine version
         if: steps.gate.outputs.do_release == 'true'

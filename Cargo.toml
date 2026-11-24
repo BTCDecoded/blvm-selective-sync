@@ -9,7 +9,7 @@ repository = "https://github.com/BTCDecoded/blvm-selective-sync"
 homepage = "https://btcdecoded.org"
 keywords = ["bitcoin", "sync", "policy", "selective"]
 categories = ["cryptography::cryptocurrencies"]
-rust-version = "1.85"
+rust-version = "1.91"
 
 [lib]
 name = "blvm_selective_sync"

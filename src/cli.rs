@@ -302,40 +302,40 @@ fn run_status<W: Write>(
         SyncPolicyConfig::config_path().display()
     )?;
 
-    if let Some(c) = ctx {
-        if let Some(node_api) = c.node_api() {
-            let (tx_snap, block_snap) = tokio::runtime::Handle::current().block_on(async {
-                let tx = get_tx_serve_denylist_snapshot(node_api.as_ref()).await.ok();
-                let block = get_block_serve_denylist_snapshot(node_api.as_ref())
-                    .await
-                    .ok();
-                (tx, block)
-            });
-            if let Some(tx) = tx_snap {
-                writeln!(w)?;
-                writeln!(
-                    w,
-                    "Tx serve denylist: {} total{}",
-                    tx.total_count,
-                    if tx.truncated {
-                        " (snapshot truncated)"
-                    } else {
-                        ""
-                    }
-                )?;
-            }
-            if let Some(block) = block_snap {
-                writeln!(
-                    w,
-                    "Block serve denylist: {} total{}",
-                    block.total_count,
-                    if block.truncated {
-                        " (snapshot truncated)"
-                    } else {
-                        ""
-                    }
-                )?;
-            }
+    if let Some(c) = ctx
+        && let Some(node_api) = c.node_api()
+    {
+        let (tx_snap, block_snap) = tokio::runtime::Handle::current().block_on(async {
+            let tx = get_tx_serve_denylist_snapshot(node_api.as_ref()).await.ok();
+            let block = get_block_serve_denylist_snapshot(node_api.as_ref())
+                .await
+                .ok();
+            (tx, block)
+        });
+        if let Some(tx) = tx_snap {
+            writeln!(w)?;
+            writeln!(
+                w,
+                "Tx serve denylist: {} total{}",
+                tx.total_count,
+                if tx.truncated {
+                    " (snapshot truncated)"
+                } else {
+                    ""
+                }
+            )?;
+        }
+        if let Some(block) = block_snap {
+            writeln!(
+                w,
+                "Block serve denylist: {} total{}",
+                block.total_count,
+                if block.truncated {
+                    " (snapshot truncated)"
+                } else {
+                    ""
+                }
+            )?;
         }
     }
 
@@ -360,25 +360,26 @@ pub fn resolve_tx_hex(
 ) -> Result<String> {
     let s = tx_hex_or_txid.trim().trim_start_matches("0x");
     // txid = 32 bytes = 64 hex chars
-    if s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()) {
-        if let Some(node_api) = ctx.node_api() {
-            let hash_bytes = hex::decode(s).context("Invalid txid hex")?;
-            let mut hash = [0u8; 32];
-            if hash_bytes.len() != 32 {
-                anyhow::bail!("txid must be 32 bytes (64 hex chars)");
-            }
-            hash.copy_from_slice(&hash_bytes);
-            let hash = blvm_node::Hash::from(hash);
-            let tx = tokio::runtime::Handle::current().block_on(async move {
-                node_api
-                    .get_transaction(&hash)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to fetch transaction from node: {e}"))?
-                    .ok_or_else(|| anyhow::anyhow!("Transaction {s} not found in node"))
-            })?;
-            let serialized = serialize_transaction(&tx);
-            return Ok(hex::encode(serialized));
+    if s.len() == 64
+        && s.chars().all(|c| c.is_ascii_hexdigit())
+        && let Some(node_api) = ctx.node_api()
+    {
+        let hash_bytes = hex::decode(s).context("Invalid txid hex")?;
+        let mut hash = [0u8; 32];
+        if hash_bytes.len() != 32 {
+            anyhow::bail!("txid must be 32 bytes (64 hex chars)");
         }
+        hash.copy_from_slice(&hash_bytes);
+        let hash = blvm_node::Hash::from(hash);
+        let tx = tokio::runtime::Handle::current().block_on(async move {
+            node_api
+                .get_transaction(&hash)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to fetch transaction from node: {e}"))?
+                .ok_or_else(|| anyhow::anyhow!("Transaction {s} not found in node"))
+        })?;
+        let serialized = serialize_transaction(&tx);
+        return Ok(hex::encode(serialized));
     }
     Ok(tx_hex_or_txid.to_string())
 }
